@@ -32,13 +32,8 @@ app.use('/api/auth',     require('./routes/auth.routes'));
 app.use('/api/products', require('./routes/product.routes'));
 app.use('/api/orders',   require('./routes/order.routes'));
 app.use('/api/users',    require('./routes/user.routes'));
-app.use('/api/ai',       require('./routes/ai.routes'));        // AI Gateway → Python
-app.use('/api/segments', require('./routes/segment.routes'));   // Customer segmentation
-app.use('/api/sale-segments', require('./routes/saleSegment.routes'));   // Sale segments
-app.use('/api/product-segments', require('./routes/productSegment.routes'));   // Product segments
-app.use('/api/sales-aggregation', require('./routes/salesAggregation.routes')); // Sales aggregation (MongoDB)
-app.use('/api/top-products', require('./routes/topProducts.routes'));          // Top products (MongoDB)
-app.use('/api/revenue',      require('./routes/revenue.routes'));              // Revenue & Sales Forecast
+app.use('/api/ai',       require('./routes/ai.routes'));
+app.use('/api/feedback', require('./routes/feedback.routes'));
 
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));

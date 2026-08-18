@@ -125,9 +125,11 @@ exports.getMonthlyRevenueBreakdown = async (req, res) => {
     const bestMonth = sortedByRevenue[0] || null;
     const worstMonth = sortedByRevenue[sortedByRevenue.length - 1] || null;
 
-    // Linear regression forecast (next 3 months)
+    // Linear regression forecast (next 5 months — Aug, Sep, Oct, Nov, Dec)
     const actualMonths = enrichedData.filter(m => m.revenue > 0).map((m, idx) => ({ x: idx, y: m.revenue }));
+    const actualOrderMonths = enrichedData.filter(m => m.orders > 0).map((m, idx) => ({ x: idx, y: m.orders }));
     const n = actualMonths.length;
+    const no = actualOrderMonths.length;
     let forecastMonths = [];
     let forecastTotalRevenue = 0;
 
@@ -139,9 +141,18 @@ exports.getMonthlyRevenueBreakdown = async (req, res) => {
       const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
       const intercept = (sumY - slope * sumX) / n;
 
-      for (let i = 1; i <= 3; i++) {
+      // Orders linear regression
+      const oSumX = actualOrderMonths.reduce((s, p) => s + p.x, 0);
+      const oSumY = actualOrderMonths.reduce((s, p) => s + p.y, 0);
+      const oSumXY = actualOrderMonths.reduce((s, p) => s + p.x * p.y, 0);
+      const oSumX2 = actualOrderMonths.reduce((s, p) => s + p.x * p.x, 0);
+      const oSlope = no > 1 ? (no * oSumXY - oSumX * oSumY) / (no * oSumX2 - oSumX * oSumX) : 0;
+      const oIntercept = no > 1 ? (oSumY - oSlope * oSumX) / no : actualOrderMonths[0]?.y || 0;
+
+      for (let i = 1; i <= 5; i++) {
         const nextX = n - 1 + i;
         const predRev = Math.max(0, Math.round(slope * nextX + intercept));
+        const predOrd = Math.max(0, Math.round(oSlope * nextX + oIntercept));
         const d = new Date();
         d.setMonth(d.getMonth() + i);
         forecastMonths.push({
@@ -149,6 +160,7 @@ exports.getMonthlyRevenueBreakdown = async (req, res) => {
           year: d.getFullYear(),
           label: `${monthNames[d.getMonth()]} ${d.getFullYear()}`,
           revenue: predRev,
+          orders: predOrd,
         });
         forecastTotalRevenue += predRev;
       }

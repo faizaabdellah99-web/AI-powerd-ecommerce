@@ -22,7 +22,18 @@ const ProductSchema = new mongoose.Schema({
   expiryDate:  { type: Date, default: null },          // Food & Beverage
   isPerishable:{ type: Boolean, default: false },      // Food & Beverage
 
-  // Demand forecasting data
+  // Ratings & Reviews
+  ratings: {
+    average: { type: Number, default: 0 },
+    count:   { type: Number, default: 0 },
+  },
+  reviews: [{
+    user:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    rating:    { type: Number, required: true, min: 1, max: 5 },
+    comment:   { type: String, default: '' },
+    createdAt: { type: Date,   default: Date.now },
+    // Note: user name is stored in User model — never exposed directly to other customers
+  }],
   salesHistory: [{
     date:     Date,
     quantity: Number,

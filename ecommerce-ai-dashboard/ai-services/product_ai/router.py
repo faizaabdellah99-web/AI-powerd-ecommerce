@@ -324,9 +324,16 @@ async def analyze_image(image: UploadFile = File(...)):
         gemini_key = os.getenv("GEMINI_API_KEY", "")
         if gemini_key and gemini_key != "your_gemini_api_key_here":
             try:
-                prompt = """You are a product cataloging expert. Analyze this product image carefully and return ONLY raw JSON (no markdown):
+                prompt = """You are a product cataloging expert. Analyze this product image carefully.
+
+IMPORTANT — READ THE TEXT ON THE IMAGE:
+- If the image shows a BOOK, MAGAZINE, or any printed material, READ the title on the cover and use it EXACTLY as the product_name (e.g. "The Great Gatsby", "Harry Potter and the Sorcerer's Stone", "National Geographic").
+- If the image shows a product with a BRAND NAME or LABEL (e.g. "Sony WH-1000XM5", "Nike Air Max", "Coca-Cola"), read that text and include it in the product_name.
+- Use the exact text you can read from the image — do NOT guess or make up a generic name.
+
+Return ONLY raw JSON (no markdown):
 {
-  "product_name": "specific product name you can identify from the image",
+  "product_name": "the EXACT name/title read from text visible in the image, or the specific product name clearly shown",
   "category": "one of: Electronics|Clothing|Home & Garden|Food & Beverage|Sports & Fitness|Beauty & Care|Books|Toys|Automotive|Health",
   "tags": ["5 relevant search tags"],
   "short_description": "one factual sentence about what you see in the image",
@@ -362,13 +369,13 @@ async def analyze_image(image: UploadFile = File(...)):
             except Exception:
                 pass  # Fall through
 
-        # Fallback: return basic info based on image analysis
+        # Fallback: return basic info — use generic category, not always Electronics
         import hashlib
         img_hash = hashlib.md5(contents).hexdigest()[:8]
 
         return CatalogResult(
             product_name=f"Product {img_hash}",
-            category="Electronics",
+            category="General Merchandise",
             tags=["product", "catalog", "ai-detected", "photo", "ecommerce"],
             short_description="Product image analyzed. Enable Gemini API key for AI-powered cataloging with detailed product recognition.",
             long_description="This product was detected from an uploaded photo. For full AI-powered cataloging with product name, category, and feature detection, add a valid GEMINI_API_KEY to the server environment.",

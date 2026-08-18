@@ -8,7 +8,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 
 const CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
-              'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
+              'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health','General Merchandise'];
 
 // ── Description via server (AI) ──────────────────────────────────────────
 async function generateDescriptionAPI(form) {
@@ -104,11 +104,24 @@ const primBtn  = { padding:'8px 14px', background:'var(--primary)', border:'none
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function ProductAIPage() {
-  // Read initial tab from URL query parameter (e.g. ?tab=vision)
-  const searchParams = new URLSearchParams(window.location.search);
-  const urlTab = searchParams.get('tab') || 'description';
+  const location = useLocation();
   const validTabs = ['description', 'vision', 'image'];
-  const [tab, setTab]         = useState(validTabs.includes(urlTab) ? urlTab : 'description');
+
+  // Read tab from URL query parameter (e.g. ?tab=vision)
+  const [tab, setTab]         = useState(() => {
+    const params = new URLSearchParams(location.search);
+    const urlTab = params.get('tab') || 'description';
+    return validTabs.includes(urlTab) ? urlTab : 'description';
+  });
+
+  // Sync tab when URL changes (e.g. sidebar sub-item clicks)
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlTab = params.get('tab') || 'description';
+    if (validTabs.includes(urlTab) && urlTab !== tab) {
+      setTab(urlTab);
+    }
+  }, [location.search]);
 
   // Description state
   const [dForm, setDForm]     = useState({ product_name:'', category:'', key_features:'', target_audience:'general shoppers', tone:'professional' });

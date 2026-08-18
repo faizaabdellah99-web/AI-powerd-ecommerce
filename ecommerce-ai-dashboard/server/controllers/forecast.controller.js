@@ -181,9 +181,9 @@ exports.getAIForecast = async (req, res) => {
       const lastRev = revenueValues[n - 1] || 1;
       growthRate = Math.round(((lastRev - firstRev) / firstRev) * 100);
 
-      // Generate 3-month forecast
+      // Generate 5-month forecast (Aug, Sep, Oct, Nov, Dec)
       const nextMonths = [];
-      for (let i = 1; i <= 3; i++) {
+      for (let i = 1; i <= 5; i++) {
         const x = n - 1 + i;
         const fRev = Math.max(0, Math.round(slope * x + intercept));
         const fOrd = Math.max(0, Math.round(oSlope * x + oIntercept));

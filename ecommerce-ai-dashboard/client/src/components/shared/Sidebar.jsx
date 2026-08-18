@@ -7,44 +7,38 @@ import api from '../../services/api';
 
 const adminNav = [
   { path: '/admin',              icon: '⊞', label: 'Dashboard'       },
-  { path: '/admin/orders',       icon: '📋', label: 'Orders',     badge:'NEW' },
+  { path: '/admin/orders',       icon: '📋', label: 'Orders'          },
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/demand',       icon: '📈', label: 'Demand Forecast' },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI',  subItems: [
-    { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
-    { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'      },
-    { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'          },
-  ]},
+  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
-  { path: '/admin/segments',     icon: '👥', label: 'Segments'        },
-  { path: '/admin/ai-chat',      icon: '💬', label: 'AI Chat'         },
+  { path: '/admin/segments',     icon: '📊', label: 'Segments'        },
+  { path: '/admin/feedback',     icon: '💬', label: 'Feedback', badge:'NEW' },
+  { path: '/admin/ai-chat',      icon: '✦',  label: 'AI Chat'         },
 ];
 
 const vendorNav = [
   { path: '/admin',              icon: '⊞', label: 'Dashboard'       },
-  { path: '/admin/orders',       icon: '📋', label: 'Orders',     badge:'NEW' },
+  { path: '/admin/orders',       icon: '📋', label: 'Orders'          },
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
-  { path: '/admin/expiry',       icon: '⏰', label: 'Expiry Tracker', badge:'NEW' },
-  { path: '/admin/segments',     icon: '👥', label: 'Segments'        },
+  { path: '/admin/expiry',       icon: '⏰', label: 'Expiry Tracker'  },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI',  subItems: [
-    { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
-    { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'      },
-    { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'          },
-  ]},
+  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
-  { path: '/admin/ai-chat',      icon: '💬', label: 'AI Chat'         },
+  { path: '/admin/feedback',     icon: '💬', label: 'Feedback', badge:'NEW' },
+  { path: '/admin/ai-chat',      icon: '✦',  label: 'AI Chat'         },
 ];
 
 const customerNav = [
-  { path: '/customer',               icon: '⊞', label: 'Dashboard'       },
-  { path: '/customer/shop',          icon: '🛍️', label: 'Shop',      badge:'NEW' },
-  { path: '/customer/chat',          icon: '💬', label: 'AI Assistant',   badge:'NEW' },
-  { path: '/customer/reorder',       icon: '🔄', label: 'Re-order AI'     },
-  { path: '/customer/visual-search', icon: '🔍', label: 'Visual Search'   },
-  { path: '/customer/orders',        icon: '📋', label: 'My Orders' },
-  { path: '/customer/profile',       icon: '👤', label: 'My Profile'      },
+  { path: '/customer',               icon: '⊞', label: 'Dashboard'     },
+  { path: '/customer/shop',          icon: '🛍️', label: 'Shop'          },
+  { path: '/customer/chat',          icon: '✦',  label: 'AI Assistant'  },
+  { path: '/customer/reorder',       icon: '🔄', label: 'Re-order AI'   },
+  { path: '/customer/visual-search', icon: '🔍', label: 'Visual Search' },
+  { path: '/customer/orders',        icon: '📋', label: 'My Orders'     },
+  { path: '/customer/feedback',      icon: '💬', label: 'Feedback', badge:'NEW' },
+  { path: '/customer/profile',       icon: '👤', label: 'My Profile'    },
 ];
 
 // Demo top customers for when API is unavailable

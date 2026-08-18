@@ -202,4 +202,62 @@ router.put('/:id/expiry-discount', protect, authorize('admin', 'vendor'), async 
   }
 });
 
+// ── POST add review (customer only) ──────────────────────────────────────────
+router.post('/:id/reviews', protect, async (req, res) => {
+  try {
+    const { rating, comment } = req.body;
+    if (!rating || rating < 1 || rating > 5)
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+
+    const product = await Product.findById(req.params.id);
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    // One review per customer per product
+    const alreadyReviewed = product.reviews.find(r => r.user.toString() === req.user._id.toString());
+    if (alreadyReviewed)
+      return res.status(400).json({ message: 'You have already reviewed this product' });
+
+    product.reviews.push({ user: req.user._id, rating: +rating, comment: comment?.trim() || '' });
+
+    // Recalculate average
+    const total = product.reviews.reduce((s, r) => s + r.rating, 0);
+    product.ratings = { average: +(total / product.reviews.length).toFixed(1), count: product.reviews.length };
+    await product.save();
+
+    res.status(201).json({ message: 'Review added', ratings: product.ratings });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── GET reviews for a product (anonymous — no customer names) ─────────────────
+router.get('/:id/reviews', async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id).select('reviews ratings name');
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    // Return reviews WITHOUT names — only masked identity
+    const anonymousReviews = product.reviews.map((r, i) => ({
+      id:        r._id,
+      rating:    r.rating,
+      comment:   r.comment,
+      createdAt: r.createdAt,
+      // Anonymous label: "Customer #1", "Customer #2" etc — no real name
+      reviewer:  `Customer #${i + 1}`,
+      verified:  true, // all reviews are from verified DB users
+    }));
+
+    res.json({ reviews: anonymousReviews, ratings: product.ratings });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── GET reviews with names (admin only) ───────────────────────────────────────
+router.get('/:id/reviews/admin', protect, authorize('admin', 'vendor'), async (req, res) => {
+  try {
+    const product = await Product.findById(req.params.id)
+      .select('reviews ratings name')
+      .populate('reviews.user', 'name email');
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json({ reviews: product.reviews, ratings: product.ratings });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 module.exports = router;
