@@ -14,8 +14,8 @@ const adminNav = [
   { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/segments',     icon: '📊', label: 'Segments'        },
-  { path: '/admin/feedback',     icon: '💬', label: 'Feedback', badge:'NEW' },
-  { path: '/admin/ai-chat',      icon: '✦',  label: 'AI Chat'         },
+  { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
+  { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },
 ];
 
 const vendorNav = [
@@ -26,18 +26,18 @@ const vendorNav = [
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
   { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
-  { path: '/admin/feedback',     icon: '💬', label: 'Feedback', badge:'NEW' },
-  { path: '/admin/ai-chat',      icon: '✦',  label: 'AI Chat'         },
+  { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
+  { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },
 ];
 
 const customerNav = [
   { path: '/customer',               icon: '⊞', label: 'Dashboard'     },
   { path: '/customer/shop',          icon: '🛍️', label: 'Shop'          },
-  { path: '/customer/chat',          icon: '✦',  label: 'AI Assistant'  },
-  { path: '/customer/reorder',       icon: '🔄', label: 'Re-order AI'   },
+  { path: '/customer/chat',          icon: '⚡',  label: 'AI Assistant'  },
   { path: '/customer/visual-search', icon: '🔍', label: 'Visual Search' },
   { path: '/customer/orders',        icon: '📋', label: 'My Orders'     },
-  { path: '/customer/feedback',      icon: '💬', label: 'Feedback', badge:'NEW' },
+  { path: '/customer/reorder',       icon: '🔄', label: 'Re-order AI'   },
+  { path: '/customer/feedback',      icon: '💬', label: 'Feedback'      },
   { path: '/customer/profile',       icon: '👤', label: 'My Profile'    },
 ];
 
@@ -59,6 +59,8 @@ export default function Sidebar() {
   const [showCustomerPanel, setShowCustomerPanel] = useState(false);
   const [expandedMenus, setExpandedMenus] = useState({});
   const [orderStats, setOrderStats] = useState({ pending: 0, today: 0, total: 0, totalRevenue: 0 });
+  const [feedbackUnread, setFeedbackUnread] = useState(0); // admin: new feedback count
+  const [replyUnread, setReplyUnread] = useState(0);       // customer: unread admin replies
 
   // Auto-expand Product AI menu if on a product-ai sub-page
   useEffect(() => {
@@ -73,6 +75,66 @@ export default function Sidebar() {
       useOrderStore.getState().resetNewOrders();
     }
   }, [location.pathname]);
+
+  // ── Feedback badges ────────────────────────────────────────────────────────
+  // Fetch unread counts on mount / role change
+  useEffect(() => {
+    if (!user) return;
+    const isAdmin = user.role === 'admin' || user.role === 'vendor';
+
+    if (isAdmin) {
+      api.get('/feedback/unread-count')
+        .then(({ data }) => setFeedbackUnread(data.count || 0))
+        .catch(() => setFeedbackUnread(0));
+    } else {
+      api.get('/feedback/unread-replies')
+        .then(({ data }) => setReplyUnread(data.count || 0))
+        .catch(() => setReplyUnread(0));
+    }
+  }, [user]);
+
+  // Reset admin feedback badge when visiting Feedback admin page
+  useEffect(() => {
+    if (location.pathname === '/admin/feedback' && (user?.role === 'admin' || user?.role === 'vendor')) {
+      setFeedbackUnread(0);
+    }
+  }, [location.pathname, user?.role]);
+
+  // Reset customer reply badge when visiting Feedback page
+  useEffect(() => {
+    if (location.pathname === '/customer/feedback' && user?.role === 'customer') {
+      setReplyUnread(0);
+      // Mark replies as read on the server
+      api.patch('/feedback/my/read').catch(() => {});
+    }
+  }, [location.pathname, user?.role]);
+
+  // Socket listeners for real-time badge updates
+  useEffect(() => {
+    const s = getSocket();
+    if (!s.connected) s.connect();
+
+    // Admin: new feedback submitted → update unread count
+    const onFeedbackNew = (data) => {
+      if (user?.role === 'admin' || user?.role === 'vendor') {
+        setFeedbackUnread(data?.unreadCount ?? (prev => prev + 1));
+      }
+    };
+
+    // Customer: admin replied → increment unread reply count
+    const onFeedbackReply = (data) => {
+      if (user?.role === 'customer') {
+        setReplyUnread(prev => prev + 1);
+      }
+    };
+
+    s.on('feedback-new', onFeedbackNew);
+    s.on('feedback-reply', onFeedbackReply);
+    return () => {
+      s.off('feedback-new', onFeedbackNew);
+      s.off('feedback-reply', onFeedbackReply);
+    };
+  }, [user?.role]);
 
   // Socket listener for new orders
   useEffect(() => {
@@ -156,9 +218,9 @@ export default function Sidebar() {
             background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: 18,
-          }}>✦</div>
+          }}>⚡</div>
           <div style={{ flex:1 }}>
-            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>AI Commerce</div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text)' }}>⚡ AI Commerce</div>
             <div style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 500 }}>{roleLabel} Portal</div>
           </div>
         </div>
@@ -195,11 +257,19 @@ export default function Sidebar() {
                       background: '#10b981', color: '#fff', letterSpacing: 0.5,
                     }}>{newOrderCount}</span>
                   )}
-                  {(item.badge && item.label !== 'Orders') && (
+                  {/* Admin Feedback badge — unread count */}
+                  {(item.label === 'Feedback' && (user?.role === 'admin' || user?.role === 'vendor') && feedbackUnread > 0) && (
                     <span style={{
                       fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                      background: '#10b981', color: '#fff', letterSpacing: 0.5,
-                    }}>{item.badge}</span>
+                      background: '#ef4444', color: '#fff', letterSpacing: 0.5,
+                    }}>{feedbackUnread > 99 ? '99+' : feedbackUnread}</span>
+                  )}
+                  {/* Customer Feedback badge — unread replies count */}
+                  {(item.label === 'Feedback' && user?.role === 'customer' && replyUnread > 0) && (
+                    <span style={{
+                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
+                      background: '#f59e0b', color: '#fff', letterSpacing: 0.5,
+                    }}>{replyUnread > 99 ? '99+' : replyUnread}</span>
                   )}
                 </NavLink>
                 {hasSubItems && (

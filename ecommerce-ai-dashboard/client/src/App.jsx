@@ -15,6 +15,8 @@ import ProductsPage         from './pages/admin/ProductsPage';
 import AIChatPage           from './pages/admin/AIChatPage';
 import InventoryPage        from './pages/admin/InventoryPage';
 import CustomerSegmentPage  from './pages/admin/CustomerSegmentPage';
+import AdminSegmentsPage    from './pages/admin/AdminSegmentsPage';
+import AdminSegmentBenefitsPage from './pages/admin/AdminSegmentBenefitsPage';
 import AdminOrdersPage      from './pages/admin/AdminOrdersPage';
 import ExpiryTrackerPage    from './pages/admin/ExpiryTrackerPage';
 import FeedbackAdminPage    from './pages/admin/FeedbackAdminPage';
@@ -29,6 +31,7 @@ import CustomerChatPage     from './pages/customer/CustomerChatPage';
 import CheckoutPage         from './pages/customer/CheckoutPage';
 import OrderConfirmedPage   from './pages/customer/OrderConfirmedPage';
 import FeedbackPage         from './pages/customer/FeedbackPage';
+import CustomerProfilePage  from './pages/customer/CustomerProfilePage';
 
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import { useAuthStore } from './store/authStore';
@@ -57,7 +60,8 @@ export default function App() {
             <Route path="pricing"           element={<SmartPricingPage />} />
             <Route path="product-ai"        element={<ProductAIPage />} />
             <Route path="products"          element={<ProductsPage />} />
-            <Route path="segments"          element={<CustomerSegmentPage />} />
+            <Route path="segments"          element={<AdminSegmentsPage />} />
+            <Route path="segment-benefits"  element={<AdminSegmentBenefitsPage />} />
             <Route path="feedback"          element={<FeedbackAdminPage />} />
             <Route path="ai-chat"           element={<AIChatPage />} />
           </Route>
@@ -71,6 +75,7 @@ export default function App() {
             <Route path="visual-search" element={<VisualSearchPage />} />
             <Route path="orders"        element={<OrdersPage />} />
             <Route path="feedback"      element={<FeedbackPage />} />
+            <Route path="profile"       element={<CustomerProfilePage />} />
           </Route>
 
           {/* Full-screen pages (no sidebar layout) */}

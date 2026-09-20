@@ -386,8 +386,8 @@ export default function AdminSegmentsPage() {
       {activeTab === 'customers' && (
         <div>
           <div style={{ marginBottom:20 }}>
-            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>የደንበኞች ምድብ (Customer Segments)</h3>
-            <p style={{ fontSize:13, color:'var(--text3)' }}>ብዙ ብር ያወጡ፣ አዲስ የተመዘገቡ እና ሊጠፉ የሚችሉ ደንበኞችን ለይቶ ማሳየት</p>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>Customer Segments</h3>
+            <p style={{ fontSize:13, color:'var(--text3)' }}>Identify high-spending, newly registered, and at-risk customers</p>
           </div>
 
           {/* Distribution Chart */}
@@ -540,8 +540,8 @@ export default function AdminSegmentsPage() {
       {activeTab === 'products' && (
         <div>
           <div style={{ marginBottom:20 }}>
-            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>የዕቃዎች ምድብ (Product Segments)</h3>
-            <p style={{ fontSize:13, color:'var(--text3)' }}>በፍጥነት የሚሸጡ፣ የተቀመጡ (Dead Stock) እና ቅድም መታዘዝ ያለባቸውን ዕቃዎች ለይቶ ማሳየት</p>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>Product Segments</h3>
+            <p style={{ fontSize:13, color:'var(--text3)' }}>Identify fast-moving, dead stock, and priority reorder products</p>
           </div>
 
           {/* Product Distribution Chart */}
@@ -658,15 +658,15 @@ export default function AdminSegmentsPage() {
       {activeTab === 'sales' && (
         <div>
           <div style={{ marginBottom:20 }}>
-            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>የሽያጭ ምድብ (Sales Segments)</h3>
-            <p style={{ fontSize:13, color:'var(--text3)' }}>የትኛው የዕቃ ዓይነት (Category) እና የትኛው አካባቢ የተሻለ ሽያጭ እንዳለው መለየት</p>
+            <h3 style={{ fontSize:16, fontWeight:700, marginBottom:8 }}>Sales Segments</h3>
+            <p style={{ fontSize:13, color:'var(--text3)' }}>Identify which product categories and locations perform best</p>
           </div>
 
           {/* ── Sales Filter Controls ── */}
           <div style={{ display:'flex', gap:12, marginBottom:20, flexWrap:'wrap', alignItems:'center' }}>
             {/* Location Filter */}
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:13, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap' }}>📍 አካባቢ (Area):</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap' }}>📍 Area:</span>
               <select
                 value={salesCityFilter}
                 onChange={e => setSalesCityFilter(e.target.value)}
@@ -682,7 +682,7 @@ export default function AdminSegmentsPage() {
                   minWidth: 120,
                 }}
               >
-                <option value="all">🌍 ሁሉም (All)</option>
+                <option value="all">🌍 All</option>
                 {availableCities.map(city => (
                   <option key={city} value={city}>{city}</option>
                 ))}
@@ -691,13 +691,13 @@ export default function AdminSegmentsPage() {
 
             {/* Time Period Filter */}
             <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-              <span style={{ fontSize:13, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap' }}>📅 ጊዜ (Period):</span>
+              <span style={{ fontSize:13, fontWeight:600, color:'var(--text2)', whiteSpace:'nowrap' }}>📅 Period:</span>
               <div style={{ display:'flex', gap:4 }}>
                 {[
-                  { value: 'all', label: 'ሁሉም' },
-                  { value: '7', label: '7 ቀን' },
-                  { value: '30', label: '30 ቀን' },
-                  { value: '90', label: '90 ቀን' },
+                  { value: 'all', label: 'All' },
+                  { value: '7', label: '7 days' },
+                  { value: '30', label: '30 days' },
+                  { value: '90', label: '90 days' },
                 ].map(opt => (
                   <FilterButton
                     key={opt.value}
@@ -836,51 +836,63 @@ export default function AdminSegmentsPage() {
           {/* ── AI Recommendations from Real Sales Data ── */}
           <Card>
             <div style={{ fontSize:15, fontWeight:700, marginBottom:12 }}>✦ AI Recommendations for Sales Segments</div>
-            {aggAIInsights?.insights?.empty ? (
-              <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.8 }}>
-                <div style={{ marginBottom:12, padding:'14px 16px', background:'var(--bg3)', borderRadius:10, textAlign:'center' }}>
-                  <div style={{ fontSize:24, marginBottom:8 }}>📭</div>
-                  <div style={{ fontWeight:600, color:'var(--text)', marginBottom:4 }}>No sales data yet</div>
-                  <div style={{ color:'var(--text3)', fontSize:12 }}>
-                    Place orders through the customer Shop to see AI-powered sales insights, category trends, and location performance here.
+            {(() => {
+              // Derive real insights from available data
+              const cats = aggCategoryData?.categories || [];
+              const locs = aggLocationData?.locations || [];
+              const hasData = cats.length > 0 || locs.length > 0;
+
+              if (!hasData) {
+                return (
+                  <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.8 }}>
+                    <div style={{ marginBottom:12, padding:'14px 16px', background:'var(--bg3)', borderRadius:10, textAlign:'center' }}>
+                      <div style={{ fontSize:24, marginBottom:8 }}>📭</div>
+                      <div style={{ fontWeight:600, color:'var(--text)', marginBottom:4 }}>No sales data yet</div>
+                      <div style={{ color:'var(--text3)', fontSize:12 }}>
+                        Place orders through the customer Shop to see AI-powered sales insights, category trends, and location performance here.
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
+
+              // Use server insights if available, otherwise derive from category/location data
+              const insights = aggAIInsights?.insights;
+              const bestCat = insights?.bestCategory || (cats.length > 0 ? { category: cats[0].category, growth: cats[0].percentage || 0, sales: cats[0].totalSales } : null);
+              const worstCat = insights?.worstCategory || (cats.length > 1 ? { category: cats[cats.length - 1].category, growth: -Math.abs(cats[cats.length - 1].percentage || 0), sales: cats[cats.length - 1].totalSales, previous: cats[cats.length - 1].totalSales } : null);
+              const topLoc = insights?.topLocation || (locs.length > 0 ? { city: locs[0].city, sales: locs[0].totalSales, orders: locs[0].orderCount } : null);
+              const totalCatSales = insights?.totalCategorySales ?? cats.reduce((s, c) => s + (c.totalSales || 0), 0);
+              const totalLocSales = insights?.totalLocationSales ?? locs.reduce((s, l) => s + (l.totalSales || 0), 0);
+              const catCount = insights?.categoryCount ?? cats.length;
+              const locCount = insights?.locationCount ?? locs.length;
+
+              return (
+                <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.8 }}>
+                  {bestCat && (
+                    <div style={{ marginBottom:12, padding:'10px 14px', background:'#10b98115', border:'1px solid #10b98133', borderRadius:10 }}>
+                      <strong style={{ color:'#10b981' }}>🏆 Best Performing Category:</strong>{' '}
+                      {bestCat.category} with <strong>${Number(bestCat.sales).toLocaleString()}</strong> in sales ({bestCat.growth || 0}% of total). Increase marketing budget and ensure adequate stock levels.
+                    </div>
+                  )}
+                  {worstCat && (
+                    <div style={{ marginBottom:12, padding:'10px 14px', background:'#ef444415', border:'1px solid #ef444433', borderRadius:10 }}>
+                      <strong style={{ color:'#ef4444' }}>📉 Lowest Performing Category:</strong>{' '}
+                      {worstCat.category} with <strong>${Number(worstCat.sales).toLocaleString()}</strong> in sales. Consider running a discount campaign or bundling with popular items.
+                    </div>
+                  )}
+                  {topLoc && (
+                    <div style={{ marginBottom:12, padding:'10px 14px', background:'#6366f115', border:'1px solid #6366f133', borderRadius:10 }}>
+                      <strong style={{ color:'#6366f1' }}>📍 Top Location:</strong>{' '}
+                      {topLoc.city} leads with ${Number(topLoc.sales).toLocaleString()} across {topLoc.orders || 0} orders. Expand delivery options and run targeted local promotions.
+                    </div>
+                  )}
+                  <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg3)', borderRadius:10 }}>
+                    <strong style={{ color:'var(--text)' }}>📊 Summary:</strong>{' '}
+                    Total category sales: <strong>${Number(totalCatSales).toLocaleString()}</strong> across {catCount} categories. Total location sales: <strong>${Number(totalLocSales).toLocaleString()}</strong> across {locCount} locations.
                   </div>
                 </div>
-              </div>
-            ) : aggAIInsights?.insights ? (
-              <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.8 }}>
-                {aggAIInsights.insights.bestCategory && (
-                  <div style={{ marginBottom:12, padding:'10px 14px', background:'#10b98115', border:'1px solid #10b98133', borderRadius:10 }}>
-                    <strong style={{ color:'#10b981' }}>🏆 Best Performing Category:</strong>{' '}
-                    {aggAIInsights.insights.bestCategory.category} grew by <strong>{aggAIInsights.insights.bestCategory.growth}%</strong> with ${Number(aggAIInsights.insights.bestCategory.sales).toLocaleString()} in sales. Increase marketing budget and ensure adequate stock levels.
-                  </div>
-                )}
-                {aggAIInsights.insights.worstCategory && (
-                  <div style={{ marginBottom:12, padding:'10px 14px', background:'#ef444415', border:'1px solid #ef444433', borderRadius:10 }}>
-                    <strong style={{ color:'#ef4444' }}>📉 Declining Category:</strong>{' '}
-                    {aggAIInsights.insights.worstCategory.category} sales dropped by <strong>{Math.abs(aggAIInsights.insights.worstCategory.growth)}%</strong> (from ${Number(aggAIInsights.insights.worstCategory.previous).toLocaleString()} to ${Number(aggAIInsights.insights.worstCategory.sales).toLocaleString()}). Consider running a discount campaign or bundling with popular items.
-                  </div>
-                )}
-                {aggAIInsights.insights.topLocation && (
-                  <div style={{ marginBottom:12, padding:'10px 14px', background:'#6366f115', border:'1px solid #6366f133', borderRadius:10 }}>
-                    <strong style={{ color:'#6366f1' }}>📍 Top Location:</strong>{' '}
-                    {aggAIInsights.insights.topLocation.city} leads with ${Number(aggAIInsights.insights.topLocation.sales).toLocaleString()} across {aggAIInsights.insights.topLocation.orders} orders. Expand delivery options and run targeted local promotions.
-                  </div>
-                )}
-                <div style={{ marginTop:12, padding:'10px 14px', background:'var(--bg3)', borderRadius:10 }}>
-                  <strong style={{ color:'var(--text)' }}>📊 Summary:</strong>{' '}
-                  Total category sales: <strong>${Number(aggAIInsights.insights.totalCategorySales).toLocaleString()}</strong> across {aggAIInsights.insights.categoryCount} categories. Total location sales: <strong>${Number(aggAIInsights.insights.totalLocationSales).toLocaleString()}</strong> across {aggAIInsights.insights.locationCount} locations.
-                </div>
-              </div>
-            ) : (
-              <div style={{ fontSize:13, color:'var(--text2)', lineHeight:1.8 }}>
-                <div style={{ marginBottom:12, padding:'10px 14px', background:'#6366f115', border:'1px solid #6366f133', borderRadius:10 }}>
-                  <strong style={{ color:'#6366f1' }}>📊 Category Strategy:</strong> Focus marketing budget on categories with positive growth. Investigate decline in declining categories — consider product refresh or promotional campaign.
-                </div>
-                <div style={{ padding:'10px 14px', background:'#10b98115', border:'1px solid #10b98133', borderRadius:10 }}>
-                  <strong style={{ color:'#10b981' }}>📍 Location Strategy:</strong> Expand delivery options and marketing in top-performing locations. For declining regions, consider local marketing push or review delivery logistics.
-                </div>
-              </div>
-            )}
+              );
+            })()}
           </Card>
         </div>
       )}

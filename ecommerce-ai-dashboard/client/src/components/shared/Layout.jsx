@@ -2,9 +2,26 @@ import Sidebar from './Sidebar';
 import AIChatAssistant from './AIChatAssistant';
 import NotificationBell from './NotificationBell';
 import { useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 
 export default function Layout({ children, title, subtitle }) {
   const { pathname } = useLocation();
+  const [theme, setTheme] = useState('dark');
+
+  // Load theme from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
 
   const getContext = () => {
     if (pathname.includes('demand'))      return 'demand forecasting and inventory management';
@@ -44,8 +61,30 @@ export default function Layout({ children, title, subtitle }) {
             {subtitle && <p  style={{ fontSize: 12, color: 'var(--text3)', margin: '2px 0 0' }}>{subtitle}</p>}
           </div>
 
-          {/* Right side: notification bell */}
+          {/* Right side: theme toggle and notification bell */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button
+              onClick={toggleTheme}
+              style={{
+                padding: '8px 12px',
+                background: 'var(--bg3)',
+                border: '1px solid var(--border)',
+                borderRadius: 8,
+                color: 'var(--text2)',
+                cursor: 'pointer',
+                fontSize: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                transition: 'all 0.2s',
+              }}
+              title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+              <span style={{ fontSize: 12, fontWeight: 500 }}>
+                {theme === 'dark' ? 'Light' : 'Dark'}
+              </span>
+            </button>
             <NotificationBell />
           </div>
         </div>

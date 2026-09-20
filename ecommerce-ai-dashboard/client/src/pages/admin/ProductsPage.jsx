@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import Button from '../../components/shared/Button';
@@ -7,7 +7,7 @@ import Spinner from '../../components/shared/Spinner';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = ['Electronics','Clothing','Home & Garden','Food & Beverage','Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
+const CATEGORIES = ['Electronics','Clothing','Fashion','Home & Garden','Food & Beverage','Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
 
 export default function ProductsPage() {
   const [products,  setProducts]  = useState([]);
@@ -387,12 +387,12 @@ export default function ProductsPage() {
                 color: saving?'var(--text3)':'#fff', border:'none', borderRadius:10,
                 fontWeight:700, fontSize:14, cursor:saving?'not-allowed':'pointer',
               }}>
-                {saving ? '⏳ Saving…' : editProd ? '✓ Update Product' : '✦ Create Product'}
+                {saving ? '⏳ Saving…' : editProd ? '✓ Update Product' : '⚡ Create Product'}
               </button>
             </div>
 
             <div style={{ marginTop:12, fontSize:11, color:'var(--text3)', textAlign:'center', lineHeight:1.6 }}>
-              ✦ Products are visible in the customer Shop immediately after saving
+              ⚡ Products are visible in the customer Shop immediately after saving
             </div>
           </div>
         </div>

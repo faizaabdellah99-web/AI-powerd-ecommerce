@@ -73,6 +73,38 @@ router.get('/segments/all', protect, authorize('admin'), async (req, res) => {
   }
 });
 
+// ── GET expiry-tracker data (admin/vendor) ─────────────────────────────────────
+router.get('/expiry-tracker', protect, authorize('admin', 'vendor'), async (req, res) => {
+  try {
+    const products = await Product.find({ expiryDate: { $ne: null } }).sort({ expiryDate: 1 });
+    const today = new Date();
+    const data = products.map(p => {
+      const daysLeft = Math.ceil((new Date(p.expiryDate) - today) / 86400000);
+      let level, discount;
+      if (daysLeft <= 7)       { level = 'critical'; discount = 40; }
+      else if (daysLeft <= 30)  { level = 'warning';  discount = 20; }
+      else                      { level = 'good';     discount = 0;  }
+      return {
+        _id: p._id,
+        name: p.name,
+        category: p.category,
+        stock: p.stock,
+        price: p.price,
+        expiryDate: p.expiryDate,
+        daysLeft,
+        isPerishable: p.isPerishable,
+        expiryStatus: p.expiryStatus || 'active',
+        images: p.images || [],
+        level,
+        discount,
+      };
+    });
+    res.json({ products: data, total: data.length });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── GET sales history for a product (for demand forecasting) ─────────────────
 router.get('/:id/sales-history', protect, authorize('admin', 'vendor'), async (req, res) => {
   try {
@@ -154,33 +186,24 @@ router.delete('/:id', protect, authorize('vendor', 'admin'), async (req, res) =>
   }
 });
 
-// ── GET expiry-tracker data (admin/vendor) ─────────────────────────────────────
-router.get('/expiry-tracker', protect, authorize('admin', 'vendor'), async (req, res) => {
+// ── PUT mark product as donated/discarded (admin/vendor) ───────────────────────
+router.put('/:id/expiry-status', protect, authorize('admin', 'vendor'), async (req, res) => {
   try {
-    const products = await Product.find({ expiryDate: { $ne: null } }).sort({ expiryDate: 1 });
-    const today = new Date();
-    const data = products.map(p => {
-      const daysLeft = Math.ceil((new Date(p.expiryDate) - today) / 86400000);
-      let level, discount;
-      if (daysLeft <= 1)        { level = 'critical'; discount = 40; }
-      else if (daysLeft <= 3)   { level = 'urgent';   discount = 30; }
-      else if (daysLeft <= 7)   { level = 'warning';  discount = 20; }
-      else if (daysLeft <= 30)  { level = 'ok';       discount = 10; }
-      else                      { level = 'good';     discount = 0;  }
-      return {
-        _id: p._id,
-        name: p.name,
-        category: p.category,
-        stock: p.stock,
-        price: p.price,
-        expiryDate: p.expiryDate,
-        daysLeft,
-        isPerishable: p.isPerishable,
-        level,
-        discount,
-      };
-    });
-    res.json({ products: data, total: data.length });
+    const { status } = req.body;
+    if (!['donated', 'discarded', 'active'].includes(status))
+      return res.status(400).json({ message: 'Status must be donated, discarded, or active' });
+
+    const filter = req.user.role === 'admin'
+      ? { _id: req.params.id }
+      : { _id: req.params.id, vendor: req.user._id };
+
+    const product = await Product.findOneAndUpdate(
+      filter,
+      { expiryStatus: status },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found or unauthorized' });
+    res.json(product);
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -196,6 +219,56 @@ router.put('/:id/expiry-discount', protect, authorize('admin', 'vendor'), async 
       { new: true }
     );
     if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json(product);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── PUT promote product to flash sale ───────────────────────────────────────────
+router.put('/:id/promote', protect, authorize('admin', 'vendor'), async (req, res) => {
+  try {
+    const { isFlashSale } = req.body;
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      { isFlashSale: isFlashSale || true, flashSaleStart: new Date() },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    res.json(product);
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── PUT mark product as waste ────────────────────────────────────────────────────
+router.put('/:id/mark-waste', protect, authorize('admin', 'vendor'), async (req, res) => {
+  try {
+    const { wasteReason, wasteDate, stockAtWaste } = req.body;
+    const product = await Product.findByIdAndUpdate(
+      req.params.id,
+      {
+        expiryStatus: 'waste',
+        wasteReason,
+        wasteDate,
+        stockAtWaste,
+        stock: 0, // Remove from inventory
+        isActive: false, // Deactivate from shop
+      },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+    
+    // Log to waste management (you could create a separate WasteLog model)
+    console.log('Waste logged:', {
+      productId: product._id,
+      productName: product.name,
+      wasteReason,
+      wasteDate,
+      stockAtWaste,
+      value: product.price * stockAtWaste,
+    });
+    
     res.json(product);
   } catch (e) {
     res.status(500).json({ message: e.message });

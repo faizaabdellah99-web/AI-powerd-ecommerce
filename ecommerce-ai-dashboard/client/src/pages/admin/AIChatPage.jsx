@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import api from '../../services/api';
@@ -69,7 +69,7 @@ function Bubble({ msg }) {
         fontSize:16, fontWeight:700, color:'#fff',
         boxShadow: isUser ? '0 2px 8px rgba(99,102,241,0.4)' : '0 2px 8px rgba(16,185,129,0.4)',
       }}>
-        {isUser ? 'U' : '✦'}
+        {isUser ? 'U' : '⚡'}
       </div>
       <div style={{ maxWidth:'72%', display:'flex', flexDirection:'column', alignItems: isUser ? 'flex-end' : 'flex-start' }}>
         <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4, fontWeight:600 }}>
@@ -168,7 +168,7 @@ export default function AIChatPage() {
           {/* AI info card */}
           <Card style={{ background:'linear-gradient(135deg,#6366f111,#8b5cf611)', border:'1px solid #6366f133' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:12 }}>
-              <div style={{ width:40, height:40, borderRadius:'50%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>✦</div>
+              <div style={{ width:40, height:40, borderRadius:'50%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20 }}>⚡</div>
               <div>
                 <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>AI 1.0</div>
                 <div style={{ display:'flex', alignItems:'center', gap:5, fontSize:11, color:'var(--success)' }}>
@@ -242,7 +242,7 @@ export default function AIChatPage() {
           {/* Header */}
           <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', background:'linear-gradient(135deg,#6366f108,#8b5cf608)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>✦</div>
+              <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>⚡</div>
               <div>
                 <div style={{ fontSize:14, fontWeight:700, color:'var(--text)' }}>AI Assistant</div>
                 <div style={{ fontSize:11, color: loading ? 'var(--warning)' : 'var(--success)' }}>
@@ -261,7 +261,7 @@ export default function AIChatPage() {
 
             {loading && (
               <div style={{ display:'flex', gap:12, marginBottom:20 }}>
-                <div style={{ width:38, height:38, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:'#fff', flexShrink:0 }}>✦</div>
+                <div style={{ width:38, height:38, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16, color:'#fff', flexShrink:0 }}>⚡</div>
                 <div style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'4px 18px 18px 18px' }}>
                   <TypingDots />
                 </div>

@@ -75,4 +75,17 @@ router.put('/profile', protect, async (req, res) => {
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
+// ── Save AI suggestions ─────────────────────────────────────────────────────────
+router.put('/ai-suggestions', protect, async (req, res) => {
+  try {
+    const { aiSuggestions } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { aiSuggestions },
+      { new: true }
+    ).select('-password');
+    res.json({ aiSuggestions: user.aiSuggestions });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
 module.exports = router;

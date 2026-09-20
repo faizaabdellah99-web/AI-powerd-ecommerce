@@ -29,6 +29,38 @@ def embed_image(pil_image) -> np.ndarray:
     vec = features.numpy()[0]
     return vec / np.linalg.norm(vec)
 
+# ── Startup: load existing product vectors from MongoDB ────────────────────────
+def load_index_from_db():
+    """Populate the FAISS index from products that already have imageVector data."""
+    global _index, _product_ids
+    try:
+        import pymongo
+        mongo_uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017/ecommerce_ai")
+        client = pymongo.MongoClient(mongo_uri, serverSelectionTimeoutMS=3000)
+        db = client.get_default_database()
+        products = db.products.find({"imageVector": {"$exists": True, "$ne": []}})
+        
+        count = 0
+        for p in products:
+            vec = p.get("imageVector")
+            if not vec or len(vec) == 0:
+                continue
+            import faiss
+            vec_arr = np.array(vec, dtype="float32").reshape(1, -1)
+            if _index is None:
+                _index = faiss.IndexFlatIP(vec_arr.shape[1])
+            _index.add(vec_arr)
+            _product_ids.append(str(p.get("_id")))
+            count += 1
+        
+        if count > 0:
+            print(f"✅ Visual search index loaded {count} products from MongoDB")
+        else:
+            print("ℹ️  Visual search index empty — no products with imageVector found")
+        client.close()
+    except Exception as e:
+        print(f"⚠️  Could not load visual search index from MongoDB: {e}")
+
 # ── Schemas ──────────────────────────────────────────────────────────────────
 class VisualSearchResult(BaseModel):
     product_id: str
@@ -64,6 +96,7 @@ async def visual_search(image: UploadFile = File(...), top_k: int = 6):
     global _index, _product_ids
     try:
         if _index is None or len(_product_ids) == 0:
+            # No products indexed — return empty so Node.js can provide fallback
             return VisualSearchResponse(results=[], total_found=0)
 
         # Read and embed uploaded image

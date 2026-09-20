@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import api from '../../services/api';
@@ -29,7 +29,7 @@ function Bubble({ msg }) {
       <div style={{ width:34, height:34, borderRadius:'50%', flexShrink:0,
         background:isUser?'linear-gradient(135deg,#6366f1,#8b5cf6)':'linear-gradient(135deg,#10b981,#059669)',
         display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, color:'#fff', fontWeight:700 }}>
-        {isUser ? (msg.author?.[0] || 'U') : '✦'}
+        {isUser ? (msg.author?.[0] || 'U') : '⚡'}
       </div>
       <div style={{ maxWidth:'75%' }}>
         <div style={{ fontSize:11, color:'var(--text3)', marginBottom:3, textAlign:isUser?'right':'left' }}>
@@ -98,7 +98,7 @@ export default function CustomerChatPage() {
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <Card style={{ background:'linear-gradient(135deg,#10b98111,#05966911)', border:'1px solid #10b98133' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:10 }}>
-              <div style={{ width:38, height:38, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>✦</div>
+              <div style={{ width:38, height:38, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>⚡</div>
               <div>
                 <div style={{ fontSize:14, fontWeight:700 }}>AI Assistant</div>
                 <div style={{ fontSize:11, color:'var(--success)', display:'flex', alignItems:'center', gap:4 }}>
@@ -152,7 +152,7 @@ export default function CustomerChatPage() {
         <div style={{ display:'flex', flexDirection:'column', background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, overflow:'hidden' }}>
           <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', background:'linear-gradient(135deg,#10b98108,#05966908)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-              <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>✦</div>
+              <div style={{ width:32, height:32, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15 }}>⚡</div>
               <div>
                 <div style={{ fontSize:14, fontWeight:700 }}>AI Shopping Assistant</div>
                 <div style={{ fontSize:11, color:loading?'var(--warning)':'var(--success)' }}>
@@ -169,7 +169,7 @@ export default function CustomerChatPage() {
             {messages.map((m,i) => <Bubble key={i} msg={m} />)}
             {loading && (
               <div style={{ display:'flex', gap:10, marginBottom:16 }}>
-                <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, color:'#fff', flexShrink:0 }}>✦</div>
+                <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#10b981,#059669)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, color:'#fff', flexShrink:0 }}>⚡</div>
                 <div style={{ background:'var(--bg3)', border:'1px solid var(--border)', borderRadius:'4px 18px 18px 18px', padding:'12px 16px', display:'flex', gap:4, alignItems:'center' }}>
                   {[0,1,2].map(i=><div key={i} style={{ width:7,height:7,borderRadius:'50%',background:'var(--success)',animation:'bounce 1.2s infinite',animationDelay:`${i*0.2}s` }} />)}
                   <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-5px)}}`}</style>

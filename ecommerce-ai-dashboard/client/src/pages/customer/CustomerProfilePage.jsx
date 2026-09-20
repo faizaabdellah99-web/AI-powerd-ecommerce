@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import { useAuthStore } from '../../store/authStore';
@@ -162,7 +162,7 @@ export default function CustomerProfilePage() {
               ].map((s, i) => (
                 <div key={i} style={{ background: 'var(--bg3)', borderRadius: 10, padding: '14px', textAlign: 'center' }}>
                   <div style={{ fontSize: 11, color: 'var(--text3)', marginBottom: 4 }}>{s.label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: s.color }}>{s.value}}</div>
                 </div>
               ))}
             </div>
@@ -196,7 +196,7 @@ export default function CustomerProfilePage() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {segment.benefits.map((b, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text2)' }}>
-                          <span style={{ color: segStyle.text }}>✦</span> {b}
+                          <span style={{ color: segStyle.text }}>⚡</span> {b}
                         </div>
                       ))}
                     </div>

@@ -1,0 +1,117 @@
+warning: in the working copy of 'ecommerce-ai-dashboard/client/src/pages/auth/LoginPage.jsx', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/ecommerce-ai-dashboard/client/src/pages/auth/LoginPage.jsx b/ecommerce-ai-dashboard/client/src/pages/auth/LoginPage.jsx[m
+[1mindex ca2af07..32b7572 100644[m
+[1m--- a/ecommerce-ai-dashboard/client/src/pages/auth/LoginPage.jsx[m
+[1m+++ b/ecommerce-ai-dashboard/client/src/pages/auth/LoginPage.jsx[m
+[36m@@ -1,25 +1,18 @@[m
+[31m-import { useState } from 'react';[m
+[32m+[m[32m﻿import { useState } from 'react';[m
+ import { useNavigate, Link } from 'react-router-dom';[m
+ import { useAuthStore } from '../../store/authStore';[m
+ import toast from 'react-hot-toast';[m
+ [m
+[31m-const FEATURES = [[m
+[31m-  { icon:'✦', label:'AI Engine',       desc:'Powered by Advanced AI'           },[m
+[31m-  { icon:'📈', label:'Demand Forecast',  desc:'AI-driven inventory predictions'   },[m
+[31m-  { icon:'💰', label:'Smart Pricing',    desc:'Dynamic pricing with competitor AI' },[m
+[31m-  { icon:'🔍', label:'Visual Search',    desc:'Find products by image instantly'  },[m
+[31m-];[m
+[31m-[m
+ const DEMOS = [[m
+[31m-  { role:'admin',    label:'Admin',    email:'admin@demo.com',    color:'#6366f1' },[m
+[31m-  { role:'vendor',   label:'Vendor',   email:'vendor@demo.com',   color:'#8b5cf6' },[m
+[31m-  { role:'customer', label:'Customer', email:'customer@demo.com', color:'#10b981' },[m
+[32m+[m[32m  { role:'admin',    label:'Admin',    email:'admin@demo.com',    color:'#6366f1', icon:'⚙️' },[m
+[32m+[m[32m  { role:'vendor',   label:'Vendor',   email:'vendor@demo.com',   color:'#8b5cf6', icon:'🏪' },[m
+[32m+[m[32m  { role:'customer', label:'Customer', email:'customer@demo.com', color:'#10b981', icon:'👤' },[m
+ ];[m
+ [m
+ export default function LoginPage() {[m
+[31m-  const [form, setForm]     = useState({ email:'', password:'' });[m
+[32m+[m[32m  const [form,    setForm]    = useState({ email:'', password:'' });[m
+[32m+[m[32m  const [showPw,  setShowPw]  = useState(false);[m
+   const [loading, setLoading] = useState(false);[m
+[31m-  const [showPw, setShowPw] = useState(false);[m
+   const { login } = useAuthStore();[m
+   const navigate  = useNavigate();[m
+ [m
+[36m@@ -36,180 +29,211 @@[m [mexport default function LoginPage() {[m
+   };[m
+ [m
+   const demoFill = (role) => {[m
+[31m-    const emails = { admin:'admin@demo.com', vendor:'vendor@demo.com', customer:'customer@demo.com' };[m
+[31m-    setForm({ email: emails[role], password:'demo123' });[m
+[31m-    toast('Demo credentials filled — click Sign in', { icon:'💡' });[m
+[32m+[m[32m    const map = { admin:'admin@demo.com', vendor:'vendor@demo.com', customer:'customer@demo.com' };[m
+[32m+[m[32m    setForm({ email: map[role], password:'demo123' });[m
+[32m+[m[32m    toast('Demo credentials filled — click Sign In', { icon:'💡' });[m
+   };[m
+ [m
+   return ([m
+[31m-    <div style={{[m
+[31m-      minHeight:'100vh', background:'var(--bg)',[m
+[31m-      display:'flex', alignItems:'stretch',[m
+[31m-    }}>[m
+[32m+[m[32m    <div style={{ minHeight:'100vh', display:'flex', overflow:'hidden' }}>[m
+       <style>{`[m
+[31m-        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }[m
+[31m-        @keyframes fadeUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }[m
+[31m-        .login-input:focus { border-color: var(--primary) !important; outline: none; }[m
+[31m-        .demo-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.2); }[m
+[32m+[m[32m        @keyframes fadeUp  { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }[m
+[32m+[m[32m        @keyframes spin    { from{transform:rotate(0deg)} to{transform:rotate(360deg)} }[m
+[32m+[m[32m        @keyframes gradBG  { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }[m
+[32m+[m[32m        @keyframes cartRoll { 0%{ left:-12%; } 100%{ left:112%; } }[m
+[32m+[m[32m        @keyframes cartBounce { 0%,100%{ transform:translateY(0) rotate(-2deg); } 50%{ transform:translateY(-12px) rotate(2deg); } }[m
+[32m+[m[32m        @keyframes floatProduct { 0%,100%{ transform:translateY(0) rotate(-4deg); } 50%{ transform:translateY(-18px) rotate(4deg); } }[m
+[32m+[m[32m        @keyframes pulseGlow { 0%,100%{opacity:0.35} 50%{opacity:0.7} }[m
+[32m+[m[32m        .login-field { width:100%; box-sizing:border-box; padding:12px 16px; border-radius:10px; font-size:14px; font-family:inherit; transition:border-color 0.15s; }[m
+[32m+[m[32m        .login-field:focus { outline:none; border-color:#6366f1 !important; }[m
+[32m+[m[32m        .demo-pill:hover { transform:translateY(-2px); }[m
+       `}</style>[m
+ [m
+[31m-      {/* ── LEFT PANEL (branding) ── */}[m
+[31m-      <div style={{[m
+[31m-        flex:1, background:'linear-gradient(145deg,#0f0f1e 0%,#1a1a3e 50%,#0f1629 100%)',[m
+[31m-        display:'flex', flexDirection:'column', justifyContent:'center', alignItems:'center',[m
+[31m-        padding:'60px 48px', position:'relative', overflow:'hidden',[m
+[31m-      }}>[m
+[31m-        {/* Background orbs */}[m
+[31m-        <div style={{ position:'absolute', top:'15%', left:'20%', width:300, height:300, borderRadius:'50%', background:'radial-gradient(circle,#6366f122 0%,transparent 70%)', pointerEvents:'none' }} />[m
+[31m-        <div style={{ position:'absolute', bottom:'20%', right:'15%', width:250, height:250, borderRadius:'50%', background:'radial-gradient(circle,#8b5cf622 0%,transparent 70%)', pointerEvents:'none' }} />[m
+[31m-        <div style={{ position:'absolute', top:'50%', left:'50%', width:200, height:200, borderRadius:'50%', background:'radial-gradient(circle,#10b98111 0%,transparent 70%)', transform:'translate(-50%,-50%)', pointerEvents:'none' }} />[m
+[31m-[m
+[31m-        {/* Logo */}[m
+[31m-        <div style={{ animation:'float 4s ease-in-out infinite', marginBottom:32, textAlign:'center' }}>[m
+[31m-          <div style={{[m
+[31m-            width:80, height:80, borderRadius:24, margin:'0 auto 16px',[m
+[31m-            background:'linear-gradient(135deg,#6366f1,#8b5cf6)',[m
+[31m-            display:'flex', alignItems:'center', justifyContent:'center', fontSize:38,[m
+[31m-            boxShadow:'0 8px 32px rgba(99,102,241,0.4)',[m
+[31m-          }}>✦</div>[m
+[31m-          <h1 style={{ fontSize:32, fontWeight:800, color:'#fff', margin:0, letterSpacing:-0.5 }}>AI Commerce</h1>[m
+[31m-          <p style={{ fontSize:15, color:'#a5b4fc', marginTop:6, fontWeight:500 }}>[m
+[31m-            AI-Powered Ecommerce Platform[m
+[31m-          </p>[m
+[31m-        </div>[m
+[31m-[m
+[31m-        {/* Feature list */}[m
+[31m-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, maxWidth:400, width:'100%', animation:'fadeUp 0.6s ease 0.2s both' }}>[m
+[31m-          {FEATURES.map((f,i) => ([m
+[31m-            <div key={i} style={{[m
+[31m-              padding:'16px 18px', borderRadius:14,[m
+[31m-              background:'rgba(255,255,255,0.05)', border:'1px solid rgba(255,255,255,0.1)',[m
+[31m-              backdropFilter:'blur(10px)',[m
+[31m-            }}>[m
+[31m-              <div style={{ fontSize:20, marginBottom:6 }}>{f.icon}</div>[m
+[31m-              <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0', marginBottom:2 }}>{f.label}</div>[m
+[31m-              <div style={{ fontSize:11, color:'#94a3b8', lineHeight:1.4 }}>{f.desc}</div>[m
+[31m-            </div>[m
+[31m-          ))}[m
+[31m-        </div>[m
+[31m-[m
+[31m-        {/* Bottom tag */}[m
+[31m-        <div style={{ marginTop:40, display:'flex', alignItems:'center', gap:10, animation:'fadeUp 0.6s ease 0.4s both' }}>[m
+[31m-          <div style={{ height:1, width:60, background:'rgba(255,255,255,0.15)' }} />[m
+[31m-          <span style={{ fontSize:12, color:'#64748b' }}>Full-stack MERN + AI</span>[m
+[31m-          <div style={

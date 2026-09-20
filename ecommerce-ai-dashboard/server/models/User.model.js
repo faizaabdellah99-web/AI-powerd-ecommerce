@@ -16,6 +16,7 @@ const UserSchema = new mongoose.Schema({
   customerSegment: { type: String, enum: ['new', 'occasional', 'regular', 'vip'], default: 'new' },
   preferences: { type: [String], default: [] },
   location: { type: String, default: '' },
+  aiSuggestions: { type: Array, default: [] },
 
   // Vendor-specific
   storeName:  { type: String, default: '' },

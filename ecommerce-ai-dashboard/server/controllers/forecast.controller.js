@@ -75,14 +75,17 @@ exports.getAIForecast = async (req, res) => {
       Product.find({ isActive: true }).sort({ stock: -1 }).limit(10).select('name category price stock salesHistory'),
     ]);
 
-    // ── Monthly revenue aggregation ────────────────────────────────────────
+    // ── Monthly revenue aggregation (Jan of current year → current month) ──
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const monthRevenue = {};
     const monthOrders = {};
     const monthProductSales = {};
 
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
+    // Build months from January of current year through current month
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth(); // 0-indexed
+    for (let m = 0; m <= currentMonthIdx; m++) {
+      const d = new Date(currentYear, m, 1);
       const key = monthNames[d.getMonth()];
       monthRevenue[key] = 0;
       monthOrders[key] = 0;
@@ -94,9 +97,8 @@ exports.getAIForecast = async (req, res) => {
       const key = monthNames[d.getMonth()];
       if (monthRevenue[key] !== undefined) {
         monthRevenue[key] += o.total || 0;
-        // Count total product quantity (e.g. 5 products = 5 orders)
-        const totalQty = (o.items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
-        monthOrders[key] += totalQty || 1;
+        // Count each order document once — matches Total Orders count
+        monthOrders[key] += 1;
         (o.items || []).forEach(item => {
           const pName = item.productName || 'Unknown';
           if (!monthProductSales[key][pName]) monthProductSales[key][pName] = 0;
@@ -118,12 +120,13 @@ exports.getAIForecast = async (req, res) => {
     });
 
     // ── Build monthly trend string ─────────────────────────────────────────
-    const actualMonths = Object.entries(monthRevenue).slice(0, 6).filter(([_, v]) => v > 0);
+    // Use the MOST RECENT 6 months (slice(-6)) — entries are ordered oldest→newest
+    const actualMonths = Object.entries(monthRevenue).slice(-6).filter(([_, v]) => v > 0);
     const revenueTrend = actualMonths.map(([m, v]) => `${m}: $${(v / 1000).toFixed(0)}k`).join(', ');
-    const orderTrend = Object.entries(monthOrders).slice(0, 6).filter(([_, v]) => v > 0).map(([m, v]) => `${m}: ${v} orders`).join(', ');
+    const orderTrend = Object.entries(monthOrders).slice(-6).filter(([_, v]) => v > 0).map(([m, v]) => `${m}: ${v} orders`).join(', ');
 
     // ── Top products recent 3 months ───────────────────────────────────────
-    const recent3Months = Object.entries(monthProductSales).slice(0, 3);
+    const recent3Months = Object.entries(monthProductSales).slice(-3);
     const productAgg = {};
     recent3Months.forEach(([_, prods]) => {
       Object.entries(prods).forEach(([name, rev]) => {
@@ -147,7 +150,8 @@ exports.getAIForecast = async (req, res) => {
     const highStockProducts = topProductsByStock.filter(p => p.stock > 100);
 
     // ── Linear regression forecast (server-side calculation) ──────────────
-    const actualData = Object.entries(monthRevenue).slice(0, 6).filter(([_, v]) => v > 0);
+    // Use the MOST RECENT 6 months (slice(-6)) — entries are ordered oldest→newest
+    const actualData = Object.entries(monthRevenue).slice(-6).filter(([_, v]) => v > 0);
     const revenueValues = actualData.map(([_, v]) => v);
     const n = revenueValues.length;
 
@@ -164,7 +168,7 @@ exports.getAIForecast = async (req, res) => {
       const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
       const intercept = (sumY - slope * sumX) / n;
 
-      const orderPoints = Object.entries(monthOrders).slice(0, 6).filter(([_, v]) => v > 0).map(([_, y], x) => ({ x, y }));
+      const orderPoints = Object.entries(monthOrders).slice(-6).filter(([_, v]) => v > 0).map(([_, y], x) => ({ x, y }));
       const oSumX = orderPoints.reduce((s, p) => s + p.x, 0);
       const oSumY = orderPoints.reduce((s, p) => s + p.y, 0);
       const oSumXY = orderPoints.reduce((s, p) => s + p.x * p.y, 0);

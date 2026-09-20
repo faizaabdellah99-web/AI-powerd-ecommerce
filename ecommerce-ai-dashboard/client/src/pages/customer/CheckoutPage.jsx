@@ -1,9 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
-
 const PAYMENT_METHODS = [
   { id:'chapa',    icon:'🏦', label:'Chapa',            desc:'Ethiopian payment — Visa, MasterCard, Mobile',  color:'#10b981' },
   { id:'telebirr', icon:'📱', label:'TeleBirr',         desc:'Ethio Telecom mobile money',                    color:'#f59e0b' },
@@ -18,9 +17,60 @@ export default function CheckoutPage() {
 
   const cartItems = location.state?.cartItems || [];
   const subtotal  = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
-  const shipping  = subtotal > 200 ? 0 : 15;
-  const tax       = Math.round(subtotal * 0.15 * 100) / 100;
-  const total     = subtotal + shipping + tax;
+
+  // ── Customer benefits applied at checkout ─────────────────────────────────────
+  const userSegment = location.state?.segment || 'regular'; // passed from ShopPage or fetched
+  const isVIP = userSegment === 'vip';
+  const isRegular = userSegment === 'regular';
+
+  const setAddr  = (k, v) => setAddress(prev => ({ ...prev, [k]: v }));
+  const [segLoading, setSegLoading] = useState(true);
+  const [segKey,     setSegKey]     = useState(userSegment);
+
+  useEffect(() => {
+    api.get('/segments/my-segment')
+      .then(({ data }) => {
+        console.log('Customer segment data:', data);
+        setSegKey(data.segment?.key || 'regular');
+      })
+      .catch(() => setSegKey('regular'))
+      .finally(() => setSegLoading(false));
+  }, []);
+
+  // Recalculate discount and shipping when segment is resolved
+  const isVIPResolved = segKey === 'vip';
+  const isRegularResolved = segKey === 'regular';
+  const isNewResolved = segKey === 'new';
+
+  // VIP: 15% discount + free shipping always
+  // Regular: 10% discount on orders over $100 + free shipping above $50
+  // New: 10% welcome discount + free shipping on first 3 orders
+  // Others: free shipping above $200
+  let discount = 0;
+  if (isVIPResolved) {
+    discount = Math.round(subtotal * 0.15 * 100) / 100;
+  } else if (isRegularResolved && subtotal >= 100) {
+    discount = Math.round(subtotal * 0.10 * 100) / 100;
+  } else if (isNewResolved) {
+    discount = Math.round(subtotal * 0.10 * 100) / 100;
+  }
+  
+  const discountedSubtotal = subtotal - discount;
+  let shipping = 15;
+  if (isVIPResolved) {
+    shipping = 0;
+  } else if (isRegularResolved && subtotal >= 50) {
+    shipping = 0;
+  } else if (isNewResolved) {
+    shipping = 0; // Free shipping for new customers
+  } else if (subtotal >= 200) {
+    shipping = 0;
+  }
+  
+  const tax  = Math.round(discountedSubtotal * 0.15 * 100) / 100;
+  const total = discountedSubtotal + shipping + tax;
+
+  console.log('Checkout calculation:', { segKey, isVIPResolved, isRegularResolved, isNewResolved, subtotal, discount, shipping, total });
 
   const [step,    setStep]    = useState(1);
   const [placing, setPlacing] = useState(false);
@@ -35,7 +85,6 @@ export default function CheckoutPage() {
   const [telePhone,   setTelePhone]   = useState('');
   const [card, setCard] = useState({ number:'', name:'', expiry:'', cvv:'' });
 
-  const setAddr = (k, v) => setAddress(p => ({ ...p, [k]: v }));
   const setCardF = (k, v) => setCard(p => ({ ...p, [k]: v }));
 
   const formatCard = (v) => v.replace(/\D/g,'').slice(0,16).replace(/(.{4})/g,'$1 ').trim();
@@ -71,10 +120,12 @@ export default function CheckoutPage() {
           price:       item.price,
           qty:         item.qty,
         })),
-        subtotal,
+        subtotal: discountedSubtotal,
         shipping,
         tax,
         total,
+        discount: discount,
+        discountType: isVIPResolved ? 'vip' : (isRegularResolved ? 'regular' : (isNewResolved ? 'new' : 'none')),
         paymentMethod: payMethod,
         shippingAddress: address,
       };
@@ -106,7 +157,7 @@ export default function CheckoutPage() {
 
       {/* Header */}
       <div style={{ background:'var(--card)', borderBottom:'1px solid var(--border)', padding:'14px 28px', display:'flex', alignItems:'center', gap:16 }}>
-        <div style={{ width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>✦</div>
+        <div style={{ width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>⚡</div>
         <span style={{ fontSize:15,fontWeight:700 }}>Secure Checkout</span>
         <span style={{ fontSize:12,color:'var(--success)',marginLeft:4 }}>🔒 SSL Secured</span>
         <button onClick={()=>navigate(-1)} style={{ marginLeft:'auto',background:'transparent',border:'1px solid var(--border)',borderRadius:8,padding:'6px 14px',color:'var(--text2)',cursor:'pointer',fontSize:13 }}>← Back</button>
@@ -145,7 +196,7 @@ export default function CheckoutPage() {
                 {[['fullName','Full Name *','e.g. Abebe Girma'],['phone','Phone Number *','09XX XXX XXXX'],['city','City *','Addis Ababa'],['subCity','Sub-City','Bole'],['woreda','Woreda','03'],['street','Street / House No.','Bole Road, House 15']].map(([k,l,ph])=>(
                   <div key={k} style={{ gridColumn:k==='street'?'1 / -1':'auto' }}>
                     <label style={{ fontSize:12,color:'var(--text2)',display:'block',marginBottom:5,fontWeight:500 }}>{l}</label>
-                    <input className="input-pay" placeholder={ph} value={address[k]} onChange={e=>setAddr(k,e.target.value)} />
+                    <input className="input-pay" placeholder={ph} value={address[k]} onChange={e=>setAddr(k, e.target.value)} />
                   </div>
                 ))}
               </div>
@@ -328,6 +379,25 @@ export default function CheckoutPage() {
                     <span style={{ fontWeight:700 }}>${(item.price*item.qty).toFixed(2)}</span>
                   </div>
                 ))}
+                {/* VIP/Regular/New savings in review */}
+                {isVIPResolved && discount > 0 && (
+                  <div style={{ marginTop:8, padding:'8px 12px', background:'#f59e0b15', border:'1px solid #f59e0b33', borderRadius:8, display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                    <span style={{ color:'#f59e0b', fontWeight:700 }}>👑 VIP Discount (15%)</span>
+                    <span style={{ color:'#f59e0b', fontWeight:800 }}>-${discount.toFixed(2)}</span>
+                  </div>
+                )}
+                {isRegularResolved && discount > 0 && (
+                  <div style={{ marginTop:8, padding:'8px 12px', background:'#10b98115', border:'1px solid #10b98133', borderRadius:8, display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                    <span style={{ color:'#10b981', fontWeight:700 }}>⭐ Regular Discount (10%)</span>
+                    <span style={{ color:'#10b981', fontWeight:800 }}>-${discount.toFixed(2)}</span>
+                  </div>
+                )}
+                {isNewResolved && discount > 0 && (
+                  <div style={{ marginTop:8, padding:'8px 12px', background:'#3b82f615', border:'1px solid #3b82f633', borderRadius:8, display:'flex', justifyContent:'space-between', fontSize:13 }}>
+                    <span style={{ color:'#3b82f6', fontWeight:700 }}>🆕 Welcome Discount (10%)</span>
+                    <span style={{ color:'#3b82f6', fontWeight:800 }}>-${discount.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Place order */}
@@ -338,7 +408,7 @@ export default function CheckoutPage() {
                   background:placing?'var(--bg3)':'linear-gradient(135deg,#10b981,#059669)',
                   color:placing?'var(--text3)':'#fff',
                 }}>
-                  {placing?'⏳ Processing payment…':'🛒 Place Order'}
+                  {placing ? '⏳ Processing payment…' : `🛒 Place Order · $${total.toFixed(2)}`}
                 </button>
               </div>
             </div>
@@ -347,30 +417,102 @@ export default function CheckoutPage() {
 
         {/* ── RIGHT: Order Summary ── */}
         <div>
-          <div style={{ background:'var(--card)',border:'1px solid var(--border)',borderRadius:16,padding:20,position:'sticky',top:20 }}>
-            <div style={{ fontSize:14,fontWeight:700,marginBottom:16 }}>Order Summary</div>
-            <div style={{ maxHeight:300,overflowY:'auto',marginBottom:16,scrollbarWidth:'thin' }}>
+          <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:16, padding:20, position:'sticky', top:20 }}>
+            <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>Order Summary</div>
+
+            {/* VIP badge */}
+            {isVIPResolved && (
+              <div style={{ padding:'10px 14px', background:'linear-gradient(135deg,#f59e0b22,#d9770622)', border:'1px solid #f59e0b44', borderRadius:10, marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:18 }}>👑</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#f59e0b' }}>VIP Benefits Applied!</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>15% discount + Free express shipping</div>
+                </div>
+              </div>
+            )}
+            {/* Regular badge */}
+            {isRegularResolved && (
+              <div style={{ padding:'10px 14px', background:'linear-gradient(135deg,#10b98122,#05966922)', border:'1px solid #10b98144', borderRadius:10, marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:18 }}>⭐</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#10b981' }}>Regular Customer Benefits!</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>10% discount on $100+ + Free shipping on $50+</div>
+                </div>
+              </div>
+            )}
+            {/* New customer badge */}
+            {isNewResolved && (
+              <div style={{ padding:'10px 14px', background:'linear-gradient(135deg,#3b82f622,#2563eb22)', border:'1px solid #3b82f644', borderRadius:10, marginBottom:14, display:'flex', alignItems:'center', gap:8 }}>
+                <span style={{ fontSize:18 }}>🆕</span>
+                <div>
+                  <div style={{ fontSize:12, fontWeight:700, color:'#3b82f6' }}>Welcome New Customer!</div>
+                  <div style={{ fontSize:11, color:'var(--text2)' }}>10% welcome discount + Free shipping</div>
+                </div>
+              </div>
+            )}
+
+            <div style={{ maxHeight:300, overflowY:'auto', marginBottom:16, scrollbarWidth:'thin' }}>
               {cartItems.map((item,i)=>(
-                <div key={i} style={{ display:'flex',justifyContent:'space-between',fontSize:13,marginBottom:10,paddingBottom:10,borderBottom:'1px solid var(--border)' }}>
+                <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:10, paddingBottom:10, borderBottom:'1px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontWeight:600,color:'var(--text)',marginBottom:2 }}>{item.name}</div>
-                    <div style={{ fontSize:11,color:'var(--text3)' }}>Qty: {item.qty}</div>
+                    <div style={{ fontWeight:600, color:'var(--text)', marginBottom:2 }}>{item.name}</div>
+                    <div style={{ fontSize:11, color:'var(--text3)' }}>Qty: {item.qty}</div>
                   </div>
-                  <div style={{ fontWeight:700,color:'var(--text)',flexShrink:0,marginLeft:8 }}>${(item.price*item.qty).toFixed(2)}</div>
+                  <div style={{ fontWeight:700, color:'var(--text)' }}>${(item.price*item.qty).toFixed(2)}</div>
                 </div>
               ))}
             </div>
-            {[['Subtotal',`$${subtotal.toFixed(2)}`],['Shipping',shipping===0?'🎉 Free':`$${shipping.toFixed(2)}`],['Tax (15%)',`$${tax.toFixed(2)}`]].map(([l,v])=>(
-              <div key={l} style={{ display:'flex',justifyContent:'space-between',fontSize:13,color:'var(--text2)',marginBottom:8 }}>
-                <span>{l}</span><span style={{ color:l==='Shipping'&&shipping===0?'var(--success)':'var(--text)' }}>{v}</span>
+
+            {/* Price breakdown */}
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--text2)', marginBottom:6 }}>
+              <span>Subtotal</span><span>${subtotal.toFixed(2)}</span>
+            </div>
+            {isVIPResolved && discount > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
+                <span style={{ color:'#f59e0b', fontWeight:600 }}>👑 VIP Discount (15%)</span>
+                <span style={{ color:'#f59e0b', fontWeight:700 }}>-${discount.toFixed(2)}</span>
               </div>
-            ))}
-            <div style={{ display:'flex',justifyContent:'space-between',fontSize:17,fontWeight:800,color:'var(--primary)',borderTop:'1px solid var(--border)',paddingTop:12,marginTop:8 }}>
+            )}
+            {isRegularResolved && discount > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
+                <span style={{ color:'#10b981', fontWeight:600 }}>⭐ Regular Discount (10%)</span>
+                <span style={{ color:'#10b981', fontWeight:700 }}>-${discount.toFixed(2)}</span>
+              </div>
+            )}
+            {isNewResolved && discount > 0 && (
+              <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6 }}>
+                <span style={{ color:'#3b82f6', fontWeight:600 }}>🆕 Welcome Discount (10%)</span>
+                <span style={{ color:'#3b82f6', fontWeight:700 }}>-${discount.toFixed(2)}</span>
+              </div>
+            )}
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--text2)', marginBottom:6 }}>
+              <span>Shipping</span>
+              <span style={{ color: shipping===0?'var(--success)':'var(--text)' }}>
+                {shipping===0 ? (isVIPResolved ? '🎁 Free (VIP)' : (isRegularResolved ? '🎁 Free (Regular)' : (isNewResolved ? '🎁 Free (New)' : '🎉 Free'))) : `$${shipping.toFixed(2)}`}
+              </span>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:13, color:'var(--text2)', marginBottom:8 }}>
+              <span>Tax (15%)</span><span>${tax.toFixed(2)}</span>
+            </div>
+            <div style={{ display:'flex', justifyContent:'space-between', fontSize:17, fontWeight:800, color:'var(--primary)', borderTop:'1px solid var(--border)', paddingTop:12, marginTop:4 }}>
               <span>Total</span><span>${total.toFixed(2)}</span>
             </div>
-            {shipping===0 && <div style={{ marginTop:8,fontSize:11,color:'var(--success)',textAlign:'center' }}>✓ Free shipping on orders over $200</div>}
-
-            <div style={{ marginTop:16,padding:'10px 12px',background:'var(--bg3)',borderRadius:8,fontSize:11,color:'var(--text3)',lineHeight:1.6 }}>
+            {isVIPResolved && (
+              <div style={{ marginTop:8, fontSize:11, color:'#f59e0b', textAlign:'center', fontWeight:600 }}>
+                👑 You saved ${discount.toFixed(2)} with VIP benefits!
+              </div>
+            )}
+            {isRegularResolved && discount > 0 && (
+              <div style={{ marginTop:8, fontSize:11, color:'#10b981', textAlign:'center', fontWeight:600 }}>
+                ⭐ You saved ${discount.toFixed(2)} with Regular customer benefits!
+              </div>
+            )}
+            {isNewResolved && discount > 0 && (
+              <div style={{ marginTop:8, fontSize:11, color:'#3b82f6', textAlign:'center', fontWeight:600 }}>
+                🆕 You saved ${discount.toFixed(2)} with your welcome discount!
+              </div>
+            )}
+            <div style={{ marginTop:12, padding:'10px 12px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--text3)', lineHeight:1.6 }}>
               🔒 Your order is protected. 30-day return policy applies.
             </div>
           </div>

@@ -5,12 +5,18 @@ from demand_forecast.reorder_router import router as reorder_router
 from smart_pricing.router import router as pricing_router
 from product_ai.router import router as product_ai_router
 from visual_search.router import router as visual_search_router
+from visual_search.router import load_index_from_db
 
 app = FastAPI(
     title="E-Commerce AI Services",
     description="AI microservices: Demand Forecast, Smart Pricing, Product AI, Visual Search",
     version="1.0.0"
 )
+
+# Load visual search index from MongoDB on startup
+@app.on_event("startup")
+async def startup():
+    load_index_from_db()
 
 app.add_middleware(
     CORSMiddleware,

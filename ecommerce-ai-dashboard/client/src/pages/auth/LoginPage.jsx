@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
 
 const FEATURES = [
-  { icon:'✦', label:'AI Engine',       desc:'Powered by Advanced AI'           },
+  { icon:'⚡', label:'Automated Inventory', desc:'Powered by Advanced AI'       },
   { icon:'📈', label:'Demand Forecast',  desc:'AI-driven inventory predictions'   },
   { icon:'💰', label:'Smart Pricing',    desc:'Dynamic pricing with competitor AI' },
   { icon:'🔍', label:'Visual Search',    desc:'Find products by image instantly'  },
@@ -20,13 +20,30 @@ export default function LoginPage() {
   const [form, setForm]     = useState({ email:'', password:'' });
   const [loading, setLoading] = useState(false);
   const [showPw, setShowPw] = useState(false);
+  const [remember, setRemember] = useState(() => localStorage.getItem('rememberMe') === 'true');
   const { login } = useAuthStore();
   const navigate  = useNavigate();
+
+  // Restore saved email if "Remember me" was checked previously
+  useEffect(() => {
+    if (remember) {
+      const savedEmail = localStorage.getItem('rememberedEmail');
+      if (savedEmail) setForm(p => ({ ...p, email: savedEmail }));
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
+      // Save/clear remembered email based on checkbox
+      if (remember) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('rememberedEmail', form.email);
+      } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('rememberedEmail');
+      }
       const user = await login(form.email, form.password);
       toast.success(`Welcome back, ${user.name}!`);
       navigate(user.role === 'customer' ? '/customer' : '/admin');
@@ -35,9 +52,17 @@ export default function LoginPage() {
     } finally { setLoading(false); }
   };
 
+  const handleForgotPassword = () => {
+    if (!form.email) {
+      toast.error('Please enter your email address first', { icon:'⚠️' });
+      return;
+    }
+    toast.success(`Password reset link sent to ${form.email}`, { icon:'📧' });
+  };
+
   const demoFill = (role) => {
-    const emails = { admin:'admin@demo.com', vendor:'vendor@demo.com', customer:'customer@demo.com' };
-    setForm({ email: emails[role], password:'demo123' });
+    const emails = { admin:'admin@gmail.com', vendor:'vendor@gmail.com', customer:'mira@gmail.com' };
+    setForm({ email: emails[role], password:'123456' });
     toast('Demo credentials filled — click Sign in', { icon:'💡' });
   };
 
@@ -71,7 +96,7 @@ export default function LoginPage() {
             background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
             display:'flex', alignItems:'center', justifyContent:'center', fontSize:38,
             boxShadow:'0 8px 32px rgba(99,102,241,0.4)',
-          }}>✦</div>
+          }}>⚡</div>
           <h1 style={{ fontSize:32, fontWeight:800, color:'#fff', margin:0, letterSpacing:-0.5 }}>AI Commerce</h1>
           <p style={{ fontSize:15, color:'#a5b4fc', marginTop:6, fontWeight:500 }}>
             AI-Powered Ecommerce Platform
@@ -134,7 +159,7 @@ export default function LoginPage() {
           </div>
 
           {/* Password */}
-          <div style={{ marginBottom:28 }}>
+          <div style={{ marginBottom:18 }}>
             <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
               <label style={{ fontSize:13, color:'var(--text2)', fontWeight:500 }}>Password</label>
             </div>
@@ -155,6 +180,25 @@ export default function LoginPage() {
             </div>
           </div>
 
+          {/* Remember me & Forgot password */}
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:18 }}>
+            <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, color:'var(--text2)' }}>
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={e => setRemember(e.target.checked)}
+                style={{ width:16, height:16, accentColor:'#6366f1', cursor:'pointer' }}
+              />
+              Remember me
+            </label>
+            <button type="button" onClick={handleForgotPassword} style={{
+              background:'none', border:'none', cursor:'pointer',
+              fontSize:13, color:'var(--primary)', fontWeight:500, padding:0,
+            }}>
+              Forgot Password?
+            </button>
+          </div>
+
           {/* Submit */}
           <button type="submit" disabled={loading} style={{
             width:'100%', padding:'13px', borderRadius:10, border:'none',
@@ -166,7 +210,7 @@ export default function LoginPage() {
           }}>
             {loading
               ? <><span style={{ animation:'spin 1s linear infinite', display:'inline-block' }}>⟳</span> Signing in…</>
-              : <><span>✦</span> Sign in</>
+              : <><span>⚡</span> Sign in</>
             }
           </button>
           <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
@@ -206,7 +250,7 @@ export default function LoginPage() {
 
         {/* AI badge */}
         <div style={{ marginTop:32, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          <div style={{ width:22, height:22, borderRadius:'50%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>✦</div>
+          <div style={{ width:22, height:22, borderRadius:'50%', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11 }}>⚡</div>
           <span style={{ fontSize:11, color:'var(--text3)' }}>Secured · AI-Powered Platform</span>
         </div>
       </div>

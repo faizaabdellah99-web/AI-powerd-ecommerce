@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import api from '../../services/api';
@@ -165,9 +165,9 @@ export default function CustomerSegmentPage() {
         <div>
           <Card style={{ marginBottom:16 }}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:bulkAdvice?14:0 }}>
-              <div><div style={{ fontSize:14,fontWeight:700 }}>✦ AI Segmentation Strategy</div><div style={{ fontSize:12,color:'var(--text3)',marginTop:2 }}>Full targeting plan</div></div>
+              <div><div style={{ fontSize:14,fontWeight:700 }}>⚡ AI Segmentation Strategy</div><div style={{ fontSize:12,color:'var(--text3)',marginTop:2 }}>Full targeting plan</div></div>
               <button onClick={getBulkStrategy} disabled={bulkLoading} style={{ padding:'8px 16px',borderRadius:9,border:'none',cursor:bulkLoading?'not-allowed':'pointer',background:bulkLoading?'var(--bg3)':'linear-gradient(135deg,#6366f1,#8b5cf6)',color:bulkLoading?'var(--text3)':'#fff',fontSize:12,fontWeight:700 }}>
-                {bulkLoading?'⏳ Generating…':'✦ Generate Strategy'}
+                {bulkLoading?'⏳ Generating…':'⚡ Generate Strategy'}
               </button>
             </div>
             {bulkAdvice && <div style={{ padding:'14px 16px',background:'var(--bg3)',borderRadius:10,border:'1px solid #6366f133',fontSize:13,color:'var(--text2)',lineHeight:1.9,whiteSpace:'pre-line',marginTop:12 }}>{bulkAdvice}</div>}
@@ -223,7 +223,7 @@ export default function CustomerSegmentPage() {
                       <div style={{ padding:'10px 12px',background:'var(--bg3)',borderRadius:10,border:`1px solid ${s.color}33`,fontSize:12,color:'var(--text2)',lineHeight:1.7,whiteSpace:'pre-line',marginBottom:10 }}>{aiAdvice[c._id]}</div>
                     )}
                     <button onClick={()=>getAiAdvice(c)} disabled={loadingId===c._id} style={{ width:'100%',padding:9,borderRadius:8,border:'none',cursor:loadingId===c._id?'not-allowed':'pointer',background:`linear-gradient(135deg,${s.color},${s.color}cc)`,color:'#fff',fontSize:12,fontWeight:700 }}>
-                      {loadingId===c._id?'⏳ Generating…':aiAdvice[c._id]?'🔄 Refresh':'✦ Get AI Advice'}
+                      {loadingId===c._id?'⏳ Generating…':aiAdvice[c._id]?'🔄 Refresh':'⚡ Get AI Advice'}
                     </button>
                   </Card>
                 );

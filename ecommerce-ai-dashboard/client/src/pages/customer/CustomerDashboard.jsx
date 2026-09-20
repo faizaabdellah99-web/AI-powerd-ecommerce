@@ -134,45 +134,10 @@ Make each suggestion specific and personal — reference their segment, spending
   // Auto-generate personalized suggestions once profile data is ready
   useEffect(() => {
     if (!loading) fetchAISuggestions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading]);
 
   return (
     <Layout title={`Hi, ${user?.name?.split(' ')[0] || 'there'} 👋`} subtitle="Your personal AI shopping assistant">
-      {/* Demo button for testing admin/vendor notifications */}
-      <div style={{ marginBottom: 16 }}>
-        <button 
-          onClick={() => {
-            const socket = getSocket();
-            // Simulate customer placing new order - admin/vendor will see notification
-            socket.emit('new-order', {
-              orderId: 'DEMO-' + Date.now(),
-              total: 150.00,
-              status: 'pending',
-              paymentStatus: 'paid',
-              customerName: user?.name || 'Demo Customer',
-              items: [
-                { productName: 'Wireless Headphones', qty: 1, price: 79.99 },
-                { productName: 'Coffee Maker X1', qty: 1, price: 49.99 }
-              ],
-              createdAt: new Date()
-            });
-          }}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--warning)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 12,
-            cursor: 'pointer',
-            fontWeight: 600
-          }}
-        >
-          🎭 Demo: Place Test Order (Admin/Vendor Notification)
-        </button>
-      </div>
-
       {/* Customer Profile Card with Segment */}
       <Card style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+﻿import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProductImage from '../../components/shared/ProductImage';
 import api from '../../services/api';
@@ -99,7 +99,7 @@ function ProductCard({ p, onAdd, qty, onOpenDetail }) {
     }}>
       {/* Badges */}
       {outOfStock && <div style={{ position:'absolute',top:10,left:10,zIndex:3,background:'#ef4444cc',color:'#fff',fontSize:10,fontWeight:800,padding:'3px 9px',borderRadius:20 }}>⚠️ Out of Stock</div>}
-      {!outOfStock && p.isAiPick && <div style={{ position:'absolute',top:10,left:10,zIndex:2,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>✦ AI pick</div>}
+      {!outOfStock && p.isAiPick && <div style={{ position:'absolute',top:10,left:10,zIndex:2,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>⚡ AI pick</div>}
       {!outOfStock && p.isNew    && <div style={{ position:'absolute',top:10,right:10,zIndex:2,background:'#10b981',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>New</div>}
       {!outOfStock && expiryInfo?.badge && <div style={{ position:'absolute',top: p.isNew?34:10,right:10,zIndex:2,background:expiryInfo.badgeColor+'22',color:expiryInfo.badgeColor,fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,border:`1px solid ${expiryInfo.badgeColor}44` }}>{expiryInfo.badge}</div>}
 
@@ -405,6 +405,22 @@ export default function ShopPage() {
   const [aiOnly,    setAiOnly]    = useState(false);
   const [cartOpen,  setCartOpen]  = useState(false);
   const [detailProduct, setDetailProduct] = useState(null); // product detail modal
+  const [theme,     setTheme]     = useState('dark');
+
+  // Load theme from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') || 'dark';
+    setTheme(savedTheme);
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  }, []);
+
+  // Toggle theme
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
 
   // ── Fetch real products from API ──────────────────────────────────────────
   const [allProducts, setAllProducts] = useState(ALL_PRODUCTS); // start with static, replace with real
@@ -484,7 +500,7 @@ export default function ShopPage() {
       {/* Navbar */}
       <div style={{ background:'var(--card)', borderBottom:'1px solid var(--border)', padding:'12px 28px', display:'flex', alignItems:'center', gap:14, position:'sticky', top:0, zIndex:100 }}>
         <div style={{ display:'flex', alignItems:'center', gap:8, marginRight:8 }}>
-          <div style={{ width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>✦</div>
+          <div style={{ width:30,height:30,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14 }}>⚡</div>
           <span style={{ fontSize:15,fontWeight:800 }}>AI Commerce</span>
         </div>
         <div style={{ flex:1, maxWidth:460 }}>
@@ -492,6 +508,28 @@ export default function ShopPage() {
             style={{ width:'100%',padding:'9px 16px',borderRadius:10,background:'var(--bg3)',border:'1px solid var(--border)',color:'var(--text)',fontSize:13,outline:'none' }} />
         </div>
         <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:12 }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              padding: '8px 12px',
+              background: 'var(--bg3)',
+              border: '1px solid var(--border)',
+              borderRadius: 8,
+              color: 'var(--text2)',
+              cursor: 'pointer',
+              fontSize: 16,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              transition: 'all 0.2s',
+            }}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+            <span style={{ fontSize: 12, fontWeight: 500 }}>
+              {theme === 'dark' ? 'Light' : 'Dark'}
+            </span>
+          </button>
           <button onClick={()=>setCartOpen(true)} style={{
             display:'flex',alignItems:'center',gap:8,padding:'8px 16px',borderRadius:10,fontWeight:700,fontSize:13,cursor:'pointer',transition:'all 0.15s',
             background:cartCount>0?'var(--primary)':'var(--bg3)', border:`1px solid ${cartCount>0?'var(--primary)':'var(--border)'}`, color:cartCount>0?'#fff':'var(--text2)',
@@ -534,7 +572,7 @@ export default function ShopPage() {
         <main style={{ flex:1, minWidth:0 }}>
           {/* AI banner */}
           <div style={{ background:'linear-gradient(135deg,#6366f111,#8b5cf611)',border:'1px solid #6366f133',borderRadius:12,padding:'14px 18px',marginBottom:20,display:'flex',alignItems:'flex-start',gap:10 }}>
-            <div style={{ width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,marginTop:1 }}>✦</div>
+            <div style={{ width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,marginTop:1 }}>⚡</div>
             <div><span style={{ fontWeight:700,color:'var(--primary)',fontSize:13 }}>AI recommendation: </span><span style={{ fontSize:13,color:'var(--text2)',lineHeight:1.6 }}>Electronics and Home & Living are trending this week. AI picks are personalised for you.</span></div>
           </div>
 
@@ -542,7 +580,7 @@ export default function ShopPage() {
           {!search && category==='All products' && (
             <div style={{ marginBottom:28 }}>
               <div style={{ display:'flex',alignItems:'center',gap:10,marginBottom:14 }}>
-                <div style={{ width:28,height:28,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13 }}>✦</div>
+                <div style={{ width:28,height:28,borderRadius:8,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13 }}>⚡</div>
                 <div><div style={{ fontSize:15,fontWeight:700,color:'var(--text)' }}>You May Also Like</div><div style={{ fontSize:11,color:'var(--text3)' }}>Based on your purchase history</div></div>
               </div>
               <div style={{ display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:14 }}>
@@ -574,7 +612,7 @@ export default function ShopPage() {
               <button onClick={()=>setAiOnly(v=>!v)} style={{
                 display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:9,border:`1px solid ${aiOnly?'var(--primary)':'var(--border)'}`,cursor:'pointer',fontSize:12,fontWeight:600,
                 background:aiOnly?'var(--primary)':'transparent',color:aiOnly?'#fff':'var(--text2)',transition:'all 0.15s',
-              }}>✦ {aiOnly?'Show all':'AI picks only'}</button>
+              }}>⚡ {aiOnly?'Show all':'AI picks only'}</button>
               <select value={sort} onChange={e=>setSort(e.target.value)} style={{ padding:'8px 12px',borderRadius:9,background:'var(--card)',border:'1px solid var(--border)',color:'var(--text)',fontSize:12,cursor:'pointer',outline:'none' }}>
                 {SORT_OPTIONS.map(s=><option key={s} value={s}>Sort: {s}</option>)}
               </select>

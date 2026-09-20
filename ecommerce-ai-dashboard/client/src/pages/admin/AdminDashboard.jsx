@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+﻿import { useState, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import StatCard from '../../components/shared/StatCard';
 import Card from '../../components/shared/Card';
@@ -61,12 +61,11 @@ export default function AdminDashboard() {
 
   useOrderSocket({
     onNewOrder: (data) => {
-      // Count total product quantity in the new order
-      const itemQty = (data.items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
       setLiveStats(prev => ({
         ...prev,
         pendingOrders: prev.pendingOrders + 1,
-        totalOrders:   prev.totalOrders + (itemQty || 1),
+        // Count each order document once — matches Total Orders stat
+        totalOrders:   prev.totalOrders + 1,
       }));
       setLiveOrders(prev => [data, ...prev.slice(0, 4)]);
       toast(`🛒 New order ${data.orderId} — $${Number(data.total).toFixed(2)} by ${data.customerName}`, { duration:5000 });
@@ -702,7 +701,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
       {/* Bottom row */}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
 
-        {/* Monthly orders bar */}
+        {/* Monthly orders bar — actual orders only (no AI forecast) */}
         <Card>
           <div style={{ fontSize:14, fontWeight:600, marginBottom:16 }}>📦 Monthly Orders</div>
           {chartData.filter(d=>d.orders!=null).length === 0 ? (
@@ -710,22 +709,29 @@ Give a 2-sentence summary with numbers. Be specific.`,
               📭 No order data yet
             </div>
           ) : (
-            <ResponsiveContainer width="100%" height={160}>
-              <BarChart data={chartData.filter(d=>d.orders!=null)}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="month" tick={{ fill:'var(--text2)', fontSize:12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill:'var(--text2)', fontSize:12 }} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:8, fontSize:12 }} />
-                <Bar dataKey="orders" fill="#6366f1" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={chartData.filter(d=>d.orders!=null)}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill:'var(--text2)', fontSize:12 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill:'var(--text2)', fontSize:12 }} axisLine={false} tickLine={false} />
+                  <Tooltip content={<CustomTooltip />} />
+                  <Bar dataKey="orders" fill="#6366f1" radius={[4,4,0,0]} name="orders" />
+                </BarChart>
+              </ResponsiveContainer>
+              <div style={{ display:'flex', gap:20, marginTop:12 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, color:'var(--text2)' }}>
+                  <div style={{ width:20, height:3, background:'#6366f1', borderRadius:2 }} />Actual Orders
+                </div>
+              </div>
+            </>
           )}
         </Card>
 
         {/* AI Insights */}
         <Card>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
-            <div style={{ fontSize:14, fontWeight:600 }}>✦ Live AI Insights</div>
+            <div style={{ fontSize:14, fontWeight:600 }}>⚡ Live AI Insights</div>
             <button onClick={fetchAIInsights} disabled={aiLoading} style={{
               display:'flex', alignItems:'center', gap:6, padding:'6px 12px',
               borderRadius:8, border:'none', cursor: aiLoading?'not-allowed':'pointer',
@@ -733,7 +739,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
               color: aiLoading ? 'var(--text3)' : '#fff',
               fontSize:11, fontWeight:700,
             }}>
-              {aiLoading ? '⏳' : '✦'} {aiInsights ? 'Refresh' : 'Generate'}
+              {aiLoading ? '⏳' : '⚡'} {aiInsights ? 'Refresh' : 'Generate'}
             </button>
           </div>
           <style>{`@keyframes insightFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
@@ -752,7 +758,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
                 </div>
               ))}
               <div style={{ fontSize:10, color:'var(--text3)', textAlign:'center', padding:'6px', background:'var(--bg3)', borderRadius:8 }}>
-                Click ✦ Generate for live AI analysis
+                Click ⚡ Generate for live AI analysis
               </div>
             </div>
           )}
@@ -783,7 +789,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
                   </div>
                 </div>
               ))}
-              <div style={{ fontSize:10, color:'var(--text3)', textAlign:'right' }}>✦ AI Analysis</div>
+              <div style={{ fontSize:10, color:'var(--text3)', textAlign:'right' }}>⚡ AI Analysis</div>
             </div>
           )}
         </Card>

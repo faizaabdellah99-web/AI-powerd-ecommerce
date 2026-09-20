@@ -34,10 +34,26 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// ── GET: Unread feedback count (for sidebar badge) ───────────────────────────
+// ── GET: Unread feedback count (for admin sidebar badge) ─────────────────────
 router.get('/unread-count', protect, authorize('admin', 'vendor'), async (req, res) => {
   try {
     const count = await Feedback.countDocuments({ status: 'new' });
+    res.json({ count });
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── GET: Unread reply count (for customer sidebar badge) ─────────────────────
+router.get('/unread-replies', protect, async (req, res) => {
+  try {
+    const idStr   = req.user._id.toString();
+    const hashNum = idStr.split('').reduce((s,c) => s + c.charCodeAt(0), 0) % 9000 + 1000;
+    const alias   = `Customer #${hashNum}`;
+
+    const count = await Feedback.countDocuments({
+      alias,
+      adminReply: { $ne: '' },
+      customerRead: false,
+    });
     res.json({ count });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
@@ -51,10 +67,26 @@ router.get('/my', protect, async (req, res) => {
     const alias  = `Customer #${hashNum}`;
 
     const items = await Feedback.find({ alias })
-      .select('category rating title message adminReply repliedAt status createdAt productName')
+      .select('category rating title message adminReply repliedAt status createdAt productName customerRead')
       .sort({ createdAt: -1 });
 
     res.json(items);
+  } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── PATCH: Mark my feedback replies as read (customer viewed them) ───────────
+router.patch('/my/read', protect, async (req, res) => {
+  try {
+    const idStr   = req.user._id.toString();
+    const hashNum = idStr.split('').reduce((s,c) => s + c.charCodeAt(0), 0) % 9000 + 1000;
+    const alias   = `Customer #${hashNum}`;
+
+    await Feedback.updateMany(
+      { alias, adminReply: { $ne: '' }, customerRead: false },
+      { $set: { customerRead: true } }
+    );
+
+    res.json({ message: 'Replies marked as read' });
   } catch (e) { res.status(500).json({ message: e.message }); }
 });
 
@@ -101,6 +133,8 @@ router.patch('/:id', protect, authorize('admin', 'vendor'), async (req, res) => 
     if (adminReply !== undefined) {
       update.adminReply = adminReply;
       update.repliedAt  = adminReply.trim() ? new Date() : null;
+      // When admin sends a reply, mark it as unread for the customer
+      if (adminReply.trim()) update.customerRead = false;
     }
 
     const feedback = await Feedback.findByIdAndUpdate(req.params.id, update, { new: true });

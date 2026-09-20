@@ -228,14 +228,17 @@ router.get('/dashboard', protect, authorize('admin', 'vendor'), async (req, res)
     // Paid orders only for revenue/chart calculations
     const paidOrders = allOrders.filter(o => o.paymentStatus === 'paid');
 
-    // ── Monthly revenue & order counts (last 6 months actual) ────────────
+    // ── Monthly revenue & order counts (Jan of current year → current month) ──
+    // Starts from January so the chart shows only the current year's months
     const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
     const monthMap = {};
     const forecastMonthMap = {};
 
-    // Build last 6 months of actual data
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(); d.setMonth(d.getMonth() - i);
+    // Build months from January of current year through current month
+    const currentYear = now.getFullYear();
+    const currentMonthIdx = now.getMonth(); // 0-indexed
+    for (let m = 0; m <= currentMonthIdx; m++) {
+      const d = new Date(currentYear, m, 1);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       monthMap[key] = { month: monthNames[d.getMonth()], revenue: 0, orders: 0 };
     }
@@ -247,23 +250,31 @@ router.get('/dashboard', protect, authorize('admin', 'vendor'), async (req, res)
       forecastMonthMap[key] = { month: monthNames[d.getMonth()], revenue: null, orders: null, forecast: 0, forecastOrders: 0 };
     }
 
-    // Populate actual monthly data — count each product item as an order entry
-    paidOrders.forEach(o => {
+    // Populate actual monthly data — count ALL orders (paid + COD/unpaid) for order counts
+    // Revenue only from paid orders
+    // Each order document counts as exactly 1 order — matches Order.countDocuments() total
+    allOrders.forEach(o => {
       const d = new Date(o.createdAt);
       const key = `${d.getFullYear()}-${d.getMonth()}`;
       if (monthMap[key]) {
-        monthMap[key].revenue += o.total || 0;
-        // Count total product quantity across all items (e.g. 5 products = 5 orders)
-        const totalQty = (o.items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
-        monthMap[key].orders += totalQty || 1;
+        // Only add revenue from paid orders
+        if (o.paymentStatus === 'paid') {
+          monthMap[key].revenue += o.total || 0;
+        }
+        // Count each order document once (NOT product quantity)
+        // This ensures monthly totals sum to the Total Orders stat
+        monthMap[key].orders += 1;
       }
     });
 
     const monthly = Object.values(monthMap);
 
     // ── AI Forecast Calculation (Linear Regression on last 6 months) ─────
-    const actualMonths = monthly.map((m, idx) => ({ x: idx, y: m.revenue }));
-    const actualOrderMonths = monthly.map((m, idx) => ({ x: idx, y: m.orders }));
+    // Use the most recent 6 months for the regression forecast
+    const recentMonthly = monthly.slice(-6);
+    const actualMonths = recentMonthly.map((m, idx) => ({ x: idx, y: m.revenue }));
+    const actualOrderMonths = recentMonthly.map((m, idx) => ({ x: idx, y: m.orders }));
+    const regressionBase = recentMonthly.length; // 6 months base for forecast extrapolation
 
     // Linear regression: y = mx + b
     function linearRegression(data) {
@@ -284,7 +295,7 @@ router.get('/dashboard', protect, authorize('admin', 'vendor'), async (req, res)
     // Generate forecast for next 3 months
     const forecastEntries = Object.entries(forecastMonthMap);
     forecastEntries.forEach(([key, val], idx) => {
-      const nextX = monthly.length + idx;
+      const nextX = regressionBase + idx;
       const predictedRevenue = Math.max(0, revReg.slope * nextX + revReg.intercept);
       const predictedOrders = Math.max(0, Math.round(ordReg.slope * nextX + ordReg.intercept));
       forecastMonthMap[key].forecast = Math.round(predictedRevenue);

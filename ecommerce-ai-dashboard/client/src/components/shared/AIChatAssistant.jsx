@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+﻿import { useState, useRef, useEffect } from 'react';
 import api from '../../services/api';
 
 const SUGGESTED = [
@@ -52,7 +52,7 @@ function Message({ msg }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 14, fontWeight: 700, color: '#fff',
       }}>
-        {isUser ? 'U' : '✦'}
+        {isUser ? 'U' : '⚡'}
       </div>
 
       {/* Bubble */}
@@ -152,8 +152,7 @@ export default function AIChatAssistant({ context = 'general' }) {
           position: 'fixed', bottom: 28, right: 28, zIndex: 1000,
           width: 56, height: 56, borderRadius: '50%', border: 'none', cursor: 'pointer',
           background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-          color: '#fff', fontSize: 22,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: '#fff', fontSize: 22,          display: 'flex', alignItems: 'center', justifyContent: 'center',
           boxShadow: '0 4px 20px rgba(99,102,241,0.5)',
           transition: 'transform 0.2s, box-shadow 0.2s',
           animation: open ? 'none' : 'pulseGlow 2.5s infinite',
@@ -161,7 +160,7 @@ export default function AIChatAssistant({ context = 'general' }) {
         onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.1)'; e.currentTarget.style.boxShadow = '0 6px 28px rgba(99,102,241,0.7)'; }}
         onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(99,102,241,0.5)'; }}
       >
-        {open ? '✕' : '✦'}
+        {open ? '✕' : '⚡'}
       </button>
 
       {/* Chat Window */}
@@ -187,7 +186,7 @@ export default function AIChatAssistant({ context = 'general' }) {
               background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 18, flexShrink: 0,
-            }}>✦</div>
+            }}>⚡</div>
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)' }}>AI Assistant</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--success)' }}>
@@ -214,7 +213,7 @@ export default function AIChatAssistant({ context = 'general' }) {
                   background: 'linear-gradient(135deg,#10b981,#059669)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 14, color: '#fff',
-                }}>✦</div>
+                }}>⚡</div>
                 <div style={{
                   background: 'var(--bg3)', border: '1px solid var(--border)',
                   borderRadius: '4px 18px 18px 18px',

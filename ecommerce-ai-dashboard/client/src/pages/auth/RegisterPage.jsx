@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../../store/authStore';
 import toast from 'react-hot-toast';
@@ -69,14 +69,14 @@ export default function RegisterPage() {
         <div style={{ position:'absolute', bottom:'20%', right:'15%', width:250, height:250, borderRadius:'50%', background:'radial-gradient(circle,#8b5cf622 0%,transparent 70%)', pointerEvents:'none' }} />
 
         <div style={{ animation:'fadeUp 0.5s ease both', textAlign:'center', marginBottom:36 }}>
-          <div style={{ width:76, height:76, borderRadius:22, margin:'0 auto 16px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:36, boxShadow:'0 8px 32px rgba(99,102,241,0.4)' }}>✦</div>
-          <h1 style={{ fontSize:30, fontWeight:800, color:'#fff', margin:0 }}>Join AI Commerce</h1>
+          <div style={{ width:76, height:76, borderRadius:22, margin:'0 auto 16px', background:'linear-gradient(135deg,#6366f1,#8b5cf6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:38, boxShadow:'0 8px 32px rgba(99,102,241,0.4)' }}>⚡</div>
+          <h1 style={{ fontSize:30, fontWeight:800, color:'#fff', margin:0 }}>⚡ AI Commerce</h1>
           <p style={{ color:'#a5b4fc', fontSize:14, marginTop:8 }}>Start your journey with AI-powered shopping</p>
         </div>
 
         <div style={{ display:'flex', flexDirection:'column', gap:14, maxWidth:340, width:'100%', animation:'fadeUp 0.5s ease 0.15s both' }}>
           {[
-            { icon:'✦', text:'AI-powered product recommendations' },
+            { icon:'⚡', text:'AI-powered product recommendations' },
             { icon:'📦', text:'Real-time order tracking' },
             { icon:'🔍', text:'Visual search — find by photo' },
             { icon:'🤖', text:'24/7 AI shopping assistant' },
@@ -181,7 +181,7 @@ export default function RegisterPage() {
           }}>
             {loading
               ? <><span style={{ animation:'spin 1s linear infinite', display:'inline-block' }}>⟳</span> Creating account…</>
-              : <>✦ Create account</>
+              : <>⚡ Create account</>
             }
           </button>
           <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>

@@ -319,6 +319,14 @@ IMPORTANT — READ THE TEXT ON THE IMAGE:
 - If the image shows a product with a BRAND NAME or LABEL (e.g. "Sony WH-1000XM5", "Nike Air Max", "Coca-Cola"), read that text and include it in the product_name.
 - Use the exact text you can read from the image — do NOT guess or make up a generic name.
 
+CATEGORY DETECTION RULES:
+- SHOES, SNEAKERS, BOOTS, SANDALS, HEELS, FOOTWEAR → category: "Clothing"
+- DRESSES, SHIRTS, PANTS, JACKETS, COATS, SKIRTS, BLOUSES, SUITS → category: "Clothing"
+- HATS, CAPS, SCARVES, GLOVES, BELTS, BAGS, JEWELRY → category: "Clothing"
+- PHONES, LAPTOPS, HEADPHONES, SPEAKERS, CAMERAS, TVS → category: "Electronics"
+- FURNITURE, CHAIRS, TABLES, LAMPS, SOFAS, BEDS → category: "Home & Garden"
+- COSMETICS, SKINCARE, PERFUME, MAKEUP → category: "Beauty & Care"
+
 Return ONLY raw JSON (no markdown):
 {
   "product_name": "the EXACT name/title read from text visible in the image, or the specific product name clearly shown",
@@ -388,7 +396,7 @@ Return ONLY raw JSON (no markdown):
     // and defaults to a generic category instead of always falling back to Electronics.
     const categoryKeywords = {
       'Electronics':   ['phone','laptop','headphone','charger','cable','speaker','camera','tv','monitor','keyboard','mouse','tablet','watch','earphone','earbud','airpod','computer','screen','battery','adapter','usb','hdmi','drone','printer','scanner','router','modem','hard drive','ssd','memory','ram','processor','cpu','gpu','fan','cooler','light','bulb','smartwatch','power bank','usb cable','charging'],
-      'Clothing':      ['shirt','dress','pants','jacket','coat','shoe','sneaker','hat','cap','sock','belt','bag','jewelry','ring','necklace','scarf','glove','hoodie','sweater','jean','short','trouser','blouse','skirt','suit','tie','wallet','backpack','purse','apparel','fashion','wearable','tshirt','t-shirt','jogger','legging','sandal','boot'],
+      'Clothing':      ['shirt','dress','pants','jacket','coat','shoe','sneaker','hat','cap','sock','belt','bag','jewelry','ring','necklace','scarf','glove','hoodie','sweater','jean','short','trouser','blouse','skirt','suit','tie','wallet','backpack','purse','apparel','fashion','wearable','tshirt','t-shirt','jogger','legging','sandal','boot','footwear','attire','clothes','cloth','outfit','garment','wear','fashion','style','heel','flat','loafer','slipper','flip flop','wedding','formal','casual','sportswear','activewear','underwear','bra','panty','boxer','brief','lingerie','nightwear','robe','kimono','cardigan','blazer','vest','tank top','crop top','pullover','cardigan','sweatshirt','polo','jersey','uniform','costume','mask','accessory'],
       'Home & Garden': ['chair','table','lamp','sofa','couch','bed','pillow','towel','pot','plant','vase','frame','mirror','rug','curtain','shelf','cabinet','drawer','mat','basket','mug','cup','plate','bowl','candle','decoration','garden','flower','soil','tool','furniture','cushion','blanket','kitchen','cookware','pan','utensil','mattress','closet'],
       'Beauty & Care': ['cream','lotion','soap','shampoo','perfume','makeup','lipstick','brush','comb','oil','mask','serum','spray','deodorant','moisturizer','sunscreen','nail','polish','face','body','hair','skin','cosmetic','fragrance','skincare','cleanser','toner','eyeliner','mascara','foundation','conditioner'],
       'Sports & Fitness': ['ball','dumbbell','yoga','mat','bike','helmet','racket','glove','strap','bottle','shorts','kettlebell','jump rope','resistance','band','gym','fitness','sport','exercise','training','weight','treadmill','skate','board','basketball','football','soccer','tennis','badminton','barbell','pull up','gym equipment','dumbbells'],
@@ -415,6 +423,13 @@ Return ONLY raw JSON (no markdown):
         bestScore = score;
         detectedCategory = cat;
       }
+    }
+
+    // Special case: if filename contains shoe-related words but didn't score high, force Clothing
+    const shoeKeywords = ['shoe','sneaker','boot','sandal','heel','footwear','loafer','slipper','flip','flop','trainer','running','walking'];
+    if (shoeKeywords.some(kw => nameLower.includes(kw))) {
+      detectedCategory = 'Clothing';
+      bestScore = 10; // Force high score
     }
 
     // No keyword matched → use a generic "General" category instead of always Electronics
@@ -451,7 +466,7 @@ Return ONLY raw JSON (no markdown):
         price: '$15 - $150',
       },
       'Clothing': {
-        tags: ['fashion', 'clothing', 'wearable', detectedCategory.toLowerCase(), 'apparel'],
+        tags: ['fashion', 'clothing', 'wearable', detectedCategory.toLowerCase(), 'apparel', 'shoe', 'dress', 'footwear', 'attire'],
         short_description: `The ${productName} is a stylish and comfortable clothing piece for everyday wear.`,
         bullet_points: [
           `${productName} — made from soft, breathable fabric for all-day comfort`,
@@ -612,4 +627,5 @@ module.exports = {
   aiChat,
   detectProduct,
   analyzeProductImage,
+  callGeminiVision,
 };

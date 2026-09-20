@@ -23,6 +23,9 @@ const FeedbackSchema = new mongoose.Schema({
   adminReply: { type: String, default: '' },   // visible to customer
   repliedAt:  { type: Date,   default: null },
   
+  // Customer read tracking — false once admin sends a reply, true once customer views it
+  customerRead: { type: Boolean, default: true }, // default true (no reply yet = nothing to read)
+  
   // Metadata (no PII stored)
   isAnonymous: { type: Boolean, default: true },
 }, { timestamps: true });

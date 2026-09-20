@@ -21,6 +21,7 @@ const ProductSchema = new mongoose.Schema({
   colors:      [String],                               // Clothing
   expiryDate:  { type: Date, default: null },          // Food & Beverage
   isPerishable:{ type: Boolean, default: false },      // Food & Beverage
+  expiryStatus:{ type: String, enum: ['active', 'donated', 'discarded'], default: 'active' },  // Expiry Tracker status
 
   // Ratings & Reviews
   ratings: {

@@ -151,10 +151,18 @@ exports.getSalesAIInsights = async (req, res) => {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000);
     const sixtyDaysAgo = new Date(now.getTime() - 60 * 86400000);
 
-    // Get category sales for current and previous period
-    const [currentCategorySales, previousCategorySales, locationSales] = await Promise.all([
+    // Match paid orders OR delivered COD orders (delivered COD = effectively paid)
+    const paidMatch = {
+      $or: [
+        { paymentStatus: 'paid' },
+        { paymentMethod: 'cod', status: 'delivered' },
+      ],
+    };
+
+    // Get category sales for current and previous period (all-time fallback)
+    const [currentCategorySales, previousCategorySales, locationSales, allTimeCategorySales, allTimeLocationSales] = await Promise.all([
       Order.aggregate([
-        { $match: { paymentStatus: 'paid', createdAt: { $gte: thirtyDaysAgo } } },
+        { $match: { ...paidMatch, createdAt: { $gte: thirtyDaysAgo } } },
         { $unwind: '$items' },
         {
           $group: {
@@ -166,7 +174,7 @@ exports.getSalesAIInsights = async (req, res) => {
         { $sort: { totalSales: -1 } },
       ]),
       Order.aggregate([
-        { $match: { paymentStatus: 'paid', createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } } },
+        { $match: { ...paidMatch, createdAt: { $gte: sixtyDaysAgo, $lt: thirtyDaysAgo } } },
         { $unwind: '$items' },
         {
           $group: {
@@ -176,7 +184,32 @@ exports.getSalesAIInsights = async (req, res) => {
         },
       ]),
       Order.aggregate([
-        { $match: { paymentStatus: 'paid', createdAt: { $gte: thirtyDaysAgo } } },
+        { $match: { ...paidMatch, createdAt: { $gte: thirtyDaysAgo } } },
+        {
+          $group: {
+            _id: { $ifNull: ['$shippingAddress.city', 'Unknown'] },
+            totalSales: { $sum: '$total' },
+            orderCount: { $sum: 1 },
+          },
+        },
+        { $sort: { totalSales: -1 } },
+      ]),
+      // All-time category sales (fallback if no recent data)
+      Order.aggregate([
+        { $match: paidMatch },
+        { $unwind: '$items' },
+        {
+          $group: {
+            _id: { $ifNull: ['$items.category', 'Other'] },
+            totalSales: { $sum: { $multiply: ['$items.price', '$items.qty'] } },
+            totalQty: { $sum: '$items.qty' },
+          },
+        },
+        { $sort: { totalSales: -1 } },
+      ]),
+      // All-time location sales (fallback if no recent data)
+      Order.aggregate([
+        { $match: paidMatch },
         {
           $group: {
             _id: { $ifNull: ['$shippingAddress.city', 'Unknown'] },
@@ -188,9 +221,13 @@ exports.getSalesAIInsights = async (req, res) => {
       ]),
     ]);
 
+    // Use all-time data as fallback if no recent data
+    const effectiveCategorySales = currentCategorySales.length > 0 ? currentCategorySales : allTimeCategorySales;
+    const effectiveLocationSales = locationSales.length > 0 ? locationSales : allTimeLocationSales;
+
     // Build category insights
     const categoryMap = {};
-    currentCategorySales.forEach(c => {
+    effectiveCategorySales.forEach(c => {
       categoryMap[c._id] = { current: c.totalSales, qty: c.totalQty };
     });
     previousCategorySales.forEach(c => {
@@ -221,10 +258,10 @@ exports.getSalesAIInsights = async (req, res) => {
     });
 
     // Build location insights
-    const topLocation = locationSales.length > 0 ? locationSales[0] : null;
-    const totalLocationSales = locationSales.reduce((s, l) => s + l.totalSales, 0);
+    const topLocation = effectiveLocationSales.length > 0 ? effectiveLocationSales[0] : null;
+    const totalLocationSales = effectiveLocationSales.reduce((s, l) => s + l.totalSales, 0);
 
-    const empty = currentCategorySales.length === 0 && locationSales.length === 0;
+    const empty = effectiveCategorySales.length === 0 && effectiveLocationSales.length === 0;
 
     res.json({
       insights: {
@@ -235,14 +272,14 @@ exports.getSalesAIInsights = async (req, res) => {
           sales: topLocation.totalSales,
           orders: topLocation.orderCount,
         } : null,
-        totalCategorySales: currentCategorySales.reduce((s, c) => s + c.totalSales, 0),
+        totalCategorySales: effectiveCategorySales.reduce((s, c) => s + c.totalSales, 0),
         totalLocationSales,
-        categoryCount: currentCategorySales.length,
-        locationCount: locationSales.length,
+        categoryCount: effectiveCategorySales.length,
+        locationCount: effectiveLocationSales.length,
         empty,
       },
       categoryMap,
-      locationSales: locationSales.map(l => ({
+      locationSales: effectiveLocationSales.map(l => ({
         city: l._id,
         sales: l.totalSales,
         orders: l.orderCount,

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import api from '../../services/api';
@@ -9,10 +9,12 @@ const STATUS = {
   low:       { color:'#f59e0b', bg:'#f59e0b15', label:'🟡 Low Stock', action:'Reorder Soon' },
   overstock: { color:'#6366f1', bg:'#6366f115', label:'🟣 Overstock', action:'Add Discount' },
   ok:        { color:'#10b981', bg:'#10b98115', label:'🟢 Healthy',   action:'Monitor'      },
+  waste:     { color:'#64748b', bg:'#64748b15', label:'🗑️ Waste',     action:'Disposed'     },
 };
 
-// Determine status from stock level
-function getStatus(stock, reorderPoint = 10) {
+// Determine status from stock level and expiry status
+function getStatus(stock, reorderPoint = 10, expiryStatus = null) {
+  if (expiryStatus === 'waste') return 'waste';
   if (stock === 0)                 return 'critical';
   if (stock <= reorderPoint * 0.5) return 'critical';
   if (stock <= reorderPoint)       return 'low';
@@ -88,7 +90,7 @@ function AlertCard({ item, onAiAction, onStockUpdate }) {
           width:'100%', padding:9, borderRadius:8, border:'none', cursor:'pointer',
           background:`linear-gradient(135deg,${cfg.color},${cfg.color}bb)`,
           color:'#fff', fontSize:12, fontWeight:700,
-        }}>✦ AI: {cfg.action}</button>
+        }}>⚡ AI: {cfg.action}</button>
       </div>
     </div>
   );
@@ -111,7 +113,7 @@ export default function InventoryPage() {
         ...p,
         _id:         p._id,
         reorderPoint: p.reorderPoint || 10,
-        status:      getStatus(p.stock, p.reorderPoint || 10),
+        status:      getStatus(p.stock, p.reorderPoint || 10, p.expiryStatus),
         dailySales:  (p.salesHistory?.slice(-7) || []).reduce((s,h)=>s+(h.quantity||0),0) / 7 || 0,
       }));
       setProducts(prods);
@@ -189,18 +191,20 @@ Give a 3-point executive summary and the single highest-priority action to take 
     low:       products.filter(p=>p.status==='low').length,
     overstock: products.filter(p=>p.status==='overstock').length,
     ok:        products.filter(p=>p.status==='ok').length,
+    waste:     products.filter(p=>p.status==='waste').length,
   };
 
   return (
     <Layout title="📦 Smart Inventory" subtitle="Real-time stock monitoring from MongoDB — updates when orders are placed">
 
       {/* Summary stats */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, marginBottom:20 }}>
         {[
           ['🔴 Critical',  counts.critical,  '#ef4444'],
           ['🟡 Low Stock', counts.low,        '#f59e0b'],
           ['🟣 Overstock', counts.overstock,  '#6366f1'],
           ['🟢 Healthy',   counts.ok,         '#10b981'],
+          ['🗑️ Waste',     counts.waste,     '#64748b'],
         ].map(([l,v,c])=>(
           <div key={l} style={{ background:'var(--card)', border:`1px solid ${c}33`, borderRadius:12, padding:'14px 18px' }}>
             <div style={{ fontSize:12, color:'var(--text3)', marginBottom:4 }}>{l}</div>
@@ -213,14 +217,14 @@ Give a 3-point executive summary and the single highest-priority action to take 
       <Card style={{ marginBottom:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom: bulkInsight?14:0 }}>
           <div>
-            <div style={{ fontSize:14, fontWeight:700 }}>✦ AI Inventory Health Analysis</div>
+            <div style={{ fontSize:14, fontWeight:700 }}>⚡ AI Inventory Health Analysis</div>
             <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>Get an executive summary of your entire inventory</div>
           </div>
           <button onClick={bulkAnalyze} disabled={bulkLoading} style={{
             padding:'8px 16px', borderRadius:9, border:'none', cursor:bulkLoading?'not-allowed':'pointer',
             background:bulkLoading?'var(--bg3)':'linear-gradient(135deg,#6366f1,#8b5cf6)',
             color:bulkLoading?'var(--text3)':'#fff', fontSize:12, fontWeight:700,
-          }}>{bulkLoading?'⏳ Analyzing…':'✦ Analyze All Inventory'}</button>
+          }}>{bulkLoading?'⏳ Analyzing…':'⚡ Analyze All Inventory'}</button>
         </div>
         {bulkInsight && (
           <div style={{ padding:'14px 16px', background:'var(--bg3)', borderRadius:10, border:'1px solid #6366f133', fontSize:13, color:'var(--text2)', lineHeight:1.8, whiteSpace:'pre-line' }}>
@@ -232,7 +236,7 @@ Give a 3-point executive summary and the single highest-priority action to take 
       {/* Filter + search */}
       <div style={{ display:'flex', gap:10, marginBottom:18, flexWrap:'wrap', alignItems:'center' }}>
         <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-          {[['all','All'],['critical','Critical'],['low','Low Stock'],['overstock','Overstock'],['ok','Healthy']].map(([v,l])=>(
+          {[['all','All'],['critical','Critical'],['low','Low Stock'],['overstock','Overstock'],['ok','Healthy'],['waste','Waste']].map(([v,l])=>(
             <button key={v} onClick={()=>setFilter(v)} style={{
               padding:'7px 16px', borderRadius:20, border:'none', cursor:'pointer', fontSize:12, fontWeight:600,
               background:filter===v?'var(--primary)':'var(--card)', color:filter===v?'#fff':'var(--text2)',
@@ -275,7 +279,7 @@ Give a 3-point executive summary and the single highest-priority action to take 
           <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:18, padding:28, maxWidth:520, width:'92%', boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
               <div>
-                <div style={{ fontSize:16, fontWeight:700 }}>✦ AI Action Plan</div>
+                <div style={{ fontSize:16, fontWeight:700 }}>⚡ AI Action Plan</div>
                 <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>{aiModal.item.name}</div>
               </div>
               <button onClick={()=>setAiModal(null)} style={{ background:'var(--bg3)', border:'none', borderRadius:8, padding:'6px 12px', color:'var(--text2)', cursor:'pointer', fontSize:16 }}>✕</button>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import api from '../../services/api';
@@ -160,7 +160,7 @@ function FeedbackCard({ item, onStatusChange, onAiAnalyze }) {
             background:`linear-gradient(135deg,${cat.color},${cat.color}cc)`,
             color:'#fff', fontSize:12, fontWeight:700,
           }}>
-            ✦ AI: Suggest Action
+            ⚡ AI: Suggest Action
           </button>
         </div>
       )}
@@ -283,7 +283,7 @@ Give a 3-point executive summary: key issue, sentiment trend, and top priority a
       <Card style={{ marginBottom:20 }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:bulkInsight?14:0 }}>
           <div>
-            <div style={{ fontSize:14,fontWeight:700 }}>✦ AI Feedback Analysis</div>
+            <div style={{ fontSize:14,fontWeight:700 }}>⚡ AI Feedback Analysis</div>
             <div style={{ fontSize:12,color:'var(--text3)',marginTop:2 }}>Executive summary of all customer feedback</div>
           </div>
           <button onClick={getBulkInsight} disabled={bulkLoading||items.length===0} style={{
@@ -291,7 +291,7 @@ Give a 3-point executive summary: key issue, sentiment trend, and top priority a
             cursor:bulkLoading||items.length===0?'not-allowed':'pointer',
             background:bulkLoading||items.length===0?'var(--bg3)':'linear-gradient(135deg,#6366f1,#8b5cf6)',
             color:bulkLoading||items.length===0?'var(--text3)':'#fff', fontSize:12, fontWeight:700,
-          }}>{bulkLoading?'⏳ Analyzing…':'✦ Analyze All Feedback'}</button>
+          }}>{bulkLoading?'⏳ Analyzing…':'⚡ Analyze All Feedback'}</button>
         </div>
         {bulkInsight && (
           <div style={{ padding:'14px 16px', background:'var(--bg3)', borderRadius:10, border:'1px solid #6366f133', fontSize:13, color:'var(--text2)', lineHeight:1.9, whiteSpace:'pre-line' }}>
@@ -371,7 +371,7 @@ Give a 3-point executive summary: key issue, sentiment trend, and top priority a
           <div style={{ background:'var(--card)', border:'1px solid var(--border)', borderRadius:18, padding:28, maxWidth:560, width:'100%', boxShadow:'0 20px 60px rgba(0,0,0,0.5)' }} onClick={e=>e.stopPropagation()}>
             <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
               <div>
-                <div style={{ fontSize:16, fontWeight:700 }}>✦ AI Action Recommendation</div>
+                <div style={{ fontSize:16, fontWeight:700 }}>⚡ AI Action Recommendation</div>
                 <div style={{ fontSize:12, color:'var(--text3)', marginTop:2 }}>
                   {CAT_CONFIG[aiModal.item.category]?.icon} {CAT_CONFIG[aiModal.item.category]?.label} · {aiModal.item.alias}
                 </div>

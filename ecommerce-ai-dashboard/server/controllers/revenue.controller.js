@@ -44,15 +44,14 @@ exports.getMonthlyRevenueBreakdown = async (req, res) => {
       };
     }
 
-    // Populate monthly data — count each product item as an order entry
+    // Populate monthly data — count each order document once (matches Total Orders)
     orders.forEach(o => {
       const d = new Date(o.createdAt);
       const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
       if (monthlyBuckets[key]) {
         monthlyBuckets[key].revenue += o.total || 0;
-        // Count total product quantity (e.g. 5 products = 5 orders)
-        const totalQty = (o.items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
-        monthlyBuckets[key].orders += totalQty || 1;
+        // Count each order document once — matches Total Orders count
+        monthlyBuckets[key].orders += 1;
         (o.items || []).forEach(item => {
           monthlyBuckets[key].itemsSold += item.qty || 0;
         });
@@ -232,9 +231,8 @@ exports.getDailyRevenueTrends = async (req, res) => {
       const key = new Date(o.createdAt).toISOString().slice(0, 10);
       if (dailyBuckets[key]) {
         dailyBuckets[key].revenue += o.total || 0;
-        // Count total product quantity (e.g. 5 products = 5 orders)
-        const totalQty = (o.items || []).reduce((sum, item) => sum + (item.qty || 0), 0);
-        dailyBuckets[key].orders += totalQty || 1;
+        // Count each order document once — matches Total Orders count
+        dailyBuckets[key].orders += 1;
       }
     });
 
