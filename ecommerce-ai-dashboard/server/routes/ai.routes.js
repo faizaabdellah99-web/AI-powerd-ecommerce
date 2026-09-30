@@ -32,6 +32,49 @@ router.post('/chat',           protect, aiChat);
 router.post('/detect-product', protect, detectProduct);
 router.post('/analyze-image',  protect, upload.single('image'), analyzeProductImage);
 
+// ── Image Search (Fallback for Product AI page) ───────────────────────────────
+router.post('/search-images', protect, async (req, res) => {
+  try {
+    const { query, category } = req.body;
+    if (!query?.trim()) return res.status(400).json({ message: 'query is required' });
+
+    // Generate AI images using Pollinations AI (free, no API key)
+    const styles = [
+      'professional product photography, studio lighting, white background',
+      'ecommerce product photo, high detail, sharp focus',
+      'product on gradient background, commercial photography',
+      'lifestyle product photo, natural lighting, modern setting',
+      'product close-up, macro photography, detailed texture',
+      'product packaging shot, clean composition, retail ready',
+    ];
+
+    const results = [];
+    const seen = new Set();
+
+    styles.forEach((style, i) => {
+      const prompt = `${query}, ${category || 'product'}, ${style}`;
+      const encoded = encodeURIComponent(prompt);
+      const url = `https://image.pollinations.ai/prompt/${encoded}?width=400&height=400&nologo=true`;
+      
+      if (!seen.has(url)) {
+        seen.add(url);
+        results.push({
+          id: `ai-${i}`,
+          thumb: url,
+          url: url,
+          label: `${query} ${i+1}`,
+          by: 'AI Generated'
+        });
+      }
+    });
+
+    res.json({ results: results.slice(0, 9) });
+  } catch (error) {
+    console.error('Image Search Error:', error.message);
+    res.status(500).json({ message: error.message });
+  }
+});
+
 // ── Visual Search (proxied to Python FastAPI) ─────────────────────────────────
 const AI_URL = process.env.AI_SERVICE_URL || 'http://localhost:8001';
 

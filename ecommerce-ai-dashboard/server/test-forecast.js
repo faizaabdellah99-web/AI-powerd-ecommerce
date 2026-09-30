@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const mongoose = require('mongoose');
 const Order = require('./models/Order.model');
 
@@ -71,15 +71,4 @@ async function test() {
   }
 }
 
-run();
-</｜DSML｜>
-<task_progress>
-- [x] Explore project structure
-- [x] Examine AdminDashboard and forecast pages
-- [x] Examine forecast/revenue controllers and routes
-- [x] Check AI services integration
-- [x] Identify why data isn't showing
-- [x] Fix the issue
-- [ ] Verify the fix
-</task_progress>
-</｜DSML｜>
+test();

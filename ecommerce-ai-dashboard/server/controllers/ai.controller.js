@@ -197,10 +197,59 @@ Return ONLY this JSON:
   "forecast": [{"date": "YYYY-MM-DD", "predicted_quantity": number, "lower_bound": number, "upper_bound": number}]
 }`;
 
-    const text  = await geminiGenerate(prompt);
-    const clean = text.replace(/```json|```/g, '').trim();
-    const data  = JSON.parse(clean);
-    res.json({ product_id: req.body.product_id, ...data });
+    try {
+      const text  = await geminiGenerate(prompt);
+      const clean = text.replace(/```json|```/g, '').trim();
+      const data  = JSON.parse(clean);
+      res.json({ product_id: req.body.product_id, ...data });
+    } catch (aiErr) {
+      // ── Fallback: Server-side linear regression forecast ────────────────
+      console.log('Gemini forecast unavailable, using server-side calculation:', aiErr.message);
+      
+      const quantities = sales_history.map(s => s.quantity || 0);
+      const n = quantities.length;
+      
+      // Linear regression: y = mx + b
+      const points = quantities.map((y, x) => ({ x, y }));
+      const sumX = points.reduce((s, p) => s + p.x, 0);
+      const sumY = points.reduce((s, p) => s + p.y, 0);
+      const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
+      const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
+      const slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) : 0;
+      const intercept = n > 0 ? (sumY - slope * sumX) / n : avg7;
+      
+      // Determine trend
+      const firstQty = quantities[0] || 0;
+      const lastQty = quantities[n - 1] || 0;
+      const trend = slope > 0.5 ? 'increasing' : slope < -0.5 ? 'decreasing' : 'stable';
+      
+      // Generate forecast for next N days
+      const forecast = Array.from({ length: forecast_days }, (_, i) => {
+        const x = n + i;
+        const predicted = Math.max(0, Math.round(slope * x + intercept));
+        const variance = Math.max(2, Math.round(avg7 * 0.15));
+        return {
+          date: new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
+          predicted_quantity: predicted,
+          lower_bound: Math.max(0, predicted - variance),
+          upper_bound: predicted + variance,
+        };
+      });
+      
+      const recommendation = trend === 'increasing'
+        ? `Stock up — demand is rising. Suggested reorder: ${Math.round(avg7 * forecast_days * 1.2)} units.`
+        : trend === 'decreasing'
+        ? `Demand is declining. Reduce orders — suggested reorder: ${Math.max(0, Math.round(avg7 * forecast_days * 0.7))} units.`
+        : `Demand is stable. Maintain current stock levels — suggested reorder: ${Math.round(avg7 * forecast_days)} units.`;
+      
+      res.json({
+        product_id: req.body.product_id,
+        trend,
+        recommendation,
+        forecast,
+        source: 'server-calculation',
+      });
+    }
 
   } catch (error) {
     console.error('Demand Forecast Error:', error.message);
@@ -234,12 +283,13 @@ PRODUCT DATA:
 ${avgComp ? `- Competitor average: $${avgComp} | min: $${minComp} | max: $${maxComp}` : ''}
 
 PRICING LOGIC TO APPLY:
-1. Stock level: high stock (>100) → lower price to move inventory; low stock (<20) → can raise price
-2. Demand trend: increasing → raise price up to 10%; decreasing → lower price 5-10%; stable → minor adjustment
-3. Competitor prices: stay competitive — do not price more than 15% above avg competitor unless rating justifies it
-4. Rating: rating above 4.5 allows premium of 5-8%; below 3.5 requires discount
-5. Days in stock: over 60 days → reduce price to clear stock; under 14 days → product is selling well
-6. Margin: never suggest a price below cost × 1.15 (minimum 15% margin)
+1. Safe Price Range: min_price = cost × 1.15, max_price = competitor_high × 1.20
+2. suggested_price = midpoint of the safe range: (min_price + max_price) / 2
+3. Stock level: high stock (>100) → lower price to move inventory; low stock (<20) → can raise price
+4. Demand trend: increasing → raise price up to 10%; decreasing → lower price 5-10%; stable → minor adjustment
+5. Competitor prices: stay competitive — do not price more than 15% above avg competitor unless rating justifies it
+6. Rating: rating above 4.5 allows premium of 5-8%; below 3.5 requires discount
+7. Days in stock: over 60 days → reduce price to clear stock; under 14 days → product is selling well
 
 Return ONLY raw JSON, no markdown:
 {
@@ -254,7 +304,51 @@ Return ONLY raw JSON, no markdown:
     const text  = await geminiGenerate(prompt);
     const clean = text.replace(/```json|```/g, '').trim();
     const data  = JSON.parse(clean);
-    res.json({ product_id, current_price, ...data });
+
+    // ── Enforce Safe Price Range formulas ──────────────────────────────────
+    //   Min = Cost × 1.15  (or slightly above purchase price)
+    //   Max = Competitor High × 1.20  (or above competitor prices)
+    //   Suggested = midpoint of the safe range
+    const minPrice = cost_price ? cost_price * 1.15 : (data.min_price || current_price * 0.8);
+    const compHigh = compPrices.length ? Math.max(...compPrices) : (data.max_price || current_price * 1.2);
+    const maxPrice = Math.max(compHigh * 1.20, minPrice);
+    const suggestedPrice = Math.round(((minPrice + maxPrice) / 2) * 100) / 100;
+    const changePct = +(((suggestedPrice - current_price) / current_price) * 100).toFixed(1);
+
+    // Calculate dynamic confidence based on data quality
+    let confidence = data.confidence ?? 0.5; // Base confidence
+    
+    // Increase confidence based on competitor data quality
+    if (compPrices.length >= 3) confidence += 0.15;
+    else if (compPrices.length >= 2) confidence += 0.10;
+    else if (compPrices.length >= 1) confidence += 0.05;
+    
+    // Increase confidence if we have cost price
+    if (cost_price > 0) confidence += 0.15;
+    
+    // Increase confidence if we have rating data
+    if (avg_rating > 0) confidence += 0.10;
+    
+    // Increase confidence if we have stock data
+    if (stock_level > 0) confidence += 0.05;
+    
+    // Adjust based on price range reasonableness
+    const priceRangeRatio = (maxPrice - minPrice) / minPrice;
+    if (priceRangeRatio > 0.2 && priceRangeRatio < 1.0) confidence += 0.05;
+    
+    // Cap confidence at 0.95
+    confidence = Math.min(confidence, 0.95);
+
+    res.json({
+      product_id,
+      current_price,
+      suggested_price: suggestedPrice,
+      min_price:       +minPrice.toFixed(2),
+      max_price:       +maxPrice.toFixed(2),
+      price_change_pct: changePct,
+      reasoning:       data.reasoning || `Market Analysis: Based on competitor pricing and cost structure, the optimal price range is $${minPrice.toFixed(2)} – $${maxPrice.toFixed(2)}. The suggested price balances competitive positioning with healthy profit margins.`,
+      confidence:      confidence,
+    });
 
   } catch (error) {
     console.error('Smart Pricing Error:', error.message);
@@ -614,7 +708,61 @@ Return ONLY raw JSON (no markdown):
 
   } catch (error) {
     console.error('Detect Product Error:', error.message);
-    res.status(500).json({ message: error.message || 'Detection failed' });
+    
+    // Fallback: Smart local detection without AI
+    const name = product_name.trim().toLowerCase();
+    const VALID_CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
+      'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
+    
+    // Smart category detection based on keywords
+    const categoryMap = [
+      ['Electronics',    ['electronic','phone','laptop','computer','tech','gadget','camera','tv','audio','headphone','keyboard','device','charger','cable','speaker','console','screen','sony','samsung','apple','macbook','iphone','galaxy','dell','hp','lenovo']],
+      ['Clothing',       ['clothing','apparel','shirt','dress','shoe','pants','jacket','hat','fashion','wear','sock','hoodie','sweater','jean','sneaker','jordan','nike','adidas']],
+      ['Home & Garden',  ['home','garden','furniture','decor','kitchen','bedding','chair','table','lamp','pot','plant','pillow','cutting','knife','ceramic','candle','herb']],
+      ['Beauty & Care',  ['beauty','care','cosmetic','skincare','makeup','perfume','lotion','shampoo','soap','cream','serum','vitamin','shampoo','bar']],
+      ['Sports & Fitness',['sport','fitness','exercise','gym','athletic','yoga','outdoor','running','training','resistance','band','dumbbell','yoga','mat','jump','rope','tennis','racket']],
+      ['Food & Beverage',['food','beverage','drink','snack','grocery','cooking','honey','yoghurt','oats','coffee','olive','oil','milk','juice']],
+      ['Books',          ['book','magazine','journal','read','atomic','habits','deep','work','pragmatic','programmer','sapiens','design','clean','code']],
+      ['Toys',           ['toy','game','play','kids','baby','lego','technic','racing','car','kitty','hello']],
+      ['Automotive',     ['automotive','car','vehicle','auto','tire','engine']],
+      ['Health',         ['health','medical','wellness','care','air','purifier','hepa']],
+    ];
+    
+    let detectedCategory = 'General Merchandise';
+    let detectedFeatures = '';
+    
+    // Find best matching category
+    let bestMatch = { category: 'General Merchandise', score: 0 };
+    for (const [category, keywords] of categoryMap) {
+      const score = keywords.filter(kw => name.includes(kw)).length;
+      if (score > bestMatch.score) {
+        bestMatch = { category, score };
+      }
+    }
+    detectedCategory = bestMatch.category;
+    
+    // Generate features based on category
+    const featureMap = {
+      'Electronics': 'High quality, durable, advanced technology, user-friendly interface, reliable performance',
+      'Clothing': 'Comfortable fit, premium materials, stylish design, breathable fabric, durable construction',
+      'Home & Garden': 'Functional design, quality materials, easy to use, aesthetic appeal, long-lasting',
+      'Beauty & Care': 'Natural ingredients, gentle formula, effective results, safe for daily use, dermatologist tested',
+      'Sports & Fitness': 'Durable materials, ergonomic design, high performance, suitable for all fitness levels, easy to maintain',
+      'Food & Beverage': 'Premium quality, natural ingredients, great taste, nutritious, fresh',
+      'Books': 'Well-written, informative, engaging content, good quality paper, clear print',
+      'Toys': 'Safe materials, educational value, fun and engaging, durable, age-appropriate',
+      'Automotive': 'High quality, reliable performance, easy installation, durable, fits most vehicles',
+      'Health': 'Effective, safe to use, high quality, good results, reliable',
+      'General Merchandise': 'Quality product, reliable performance, good value, easy to use, durable'
+    };
+    
+    detectedFeatures = featureMap[detectedCategory] || featureMap['General Merchandise'];
+    
+    res.json({ 
+      category: detectedCategory, 
+      features: detectedFeatures,
+      _fallback: true 
+    });
   }
 };
 

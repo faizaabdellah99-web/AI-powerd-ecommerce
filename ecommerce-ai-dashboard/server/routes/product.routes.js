@@ -209,6 +209,35 @@ router.put('/:id/expiry-status', protect, authorize('admin', 'vendor'), async (r
   }
 });
 
+// ── PUT apply AI suggested price ───────────────────────────────────────────────
+router.put('/:id/apply-price', protect, authorize('admin', 'vendor'), async (req, res) => {
+  try {
+    const { suggestedPrice } = req.body;
+    if (!suggestedPrice || suggestedPrice <= 0)
+      return res.status(400).json({ message: 'suggestedPrice must be a positive number' });
+
+    // Validate MongoDB ObjectId
+    const mongoose = require('mongoose');
+    if (!mongoose.Types.ObjectId.isValid(req.params.id))
+      return res.status(400).json({ message: 'Invalid product ID — must be a valid MongoDB ObjectId' });
+
+    const filter = req.user.role === 'admin'
+      ? { _id: req.params.id }
+      : { _id: req.params.id, vendor: req.user._id };
+
+    const product = await Product.findOneAndUpdate(
+      filter,
+      { price: suggestedPrice, aiPrice: suggestedPrice },
+      { new: true, runValidators: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found or unauthorized' });
+    res.json({ message: 'Price updated successfully', product });
+  } catch (e) {
+    console.error('PUT /products/:id/apply-price error:', e.message);
+    res.status(500).json({ message: e.message });
+  }
+});
+
 // ── PUT apply expiry discount ──────────────────────────────────────────────────
 router.put('/:id/expiry-discount', protect, authorize('admin', 'vendor'), async (req, res) => {
   try {

@@ -41,6 +41,13 @@ app.use('/api/product-segments',  require('./routes/productSegment.routes'));
 app.use('/api/sale-segments',     require('./routes/saleSegment.routes'));
 app.use('/api/sales-aggregation', require('./routes/salesAggregation.routes'));
 
+// ─── Competitor routes ───────────────────────────────────────────────────────
+app.use('/api/competitor',        require('./routes/competitor.routes'));
+
+// ─── Revenue & Top Products routes ───────────────────────────────────────────
+app.use('/api/revenue',           require('./routes/revenue.routes'));
+app.use('/api/top-products',      require('./routes/topProducts.routes'));
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 

@@ -156,7 +156,9 @@ export default function ProductAIPage() {
     if (!dForm.product_name.trim()) return toast.error('Product name is required');
     setDLoading(true); setDResult(null); setDError('');
     try {
+      console.log('Generating description for:', dForm);
       const result = await generateDescriptionAPI(dForm);
+      console.log('Description result:', result);
       setDResult(result);
       if (result._fallback) {
         toast('⚡ Quota exceeded — showing smart template. Add features for better results.', { icon: '⚡', duration: 4000 });
@@ -164,68 +166,64 @@ export default function ProductAIPage() {
         toast.success('Description generated!');
       }
     } catch (err) {
+      console.error('Description generation error:', err);
       const msg = err.response?.data?.message || err.message || '';
       const isQuota = msg.toLowerCase().includes('quota') || msg.toLowerCase().includes('429') || err.response?.status === 429 || err.response?.status === 500;
 
-      if (isQuota) {
-        // Build smart local description without AI quota
-        const name  = dForm.product_name.trim();
-        const feats = dForm.key_features.split(',').map(s=>s.trim()).filter(Boolean);
-        const cat   = dForm.category || 'product';
-        const aud   = dForm.target_audience || 'everyday users';
-        const brand = name.split(' ')[0];
-        const nl    = name.toLowerCase();
+      // Always use local fallback for any error (quota, 500, etc.)
+      const name  = dForm.product_name.trim();
+      const feats = dForm.key_features.split(',').map(s=>s.trim()).filter(Boolean);
+      const cat   = dForm.category || 'product';
+      const aud   = dForm.target_audience || 'everyday users';
+      const brand = name.split(' ')[0];
+      const nl    = name.toLowerCase();
 
-        const isHeadphone = nl.includes('headphone')||nl.includes('wh-')||nl.includes('earphone')||nl.includes('earbud')||nl.includes('airpod');
-        const isPhone     = nl.includes('phone')||nl.includes('iphone')||nl.includes('galaxy')||nl.includes('pixel');
-        const isLaptop    = nl.includes('laptop')||nl.includes('macbook')||nl.includes('notebook')||nl.includes('thinkpad');
-        const isSpeaker   = nl.includes('speaker')||nl.includes('soundbar')||nl.includes('jbl')||nl.includes('bose');
-        const isShoe      = nl.includes('shoe')||nl.includes('sneaker')||nl.includes('air max')||nl.includes('jordan');
+      const isHeadphone = nl.includes('headphone')||nl.includes('wh-')||nl.includes('earphone')||nl.includes('earbud')||nl.includes('airpod');
+      const isPhone     = nl.includes('phone')||nl.includes('iphone')||nl.includes('galaxy')||nl.includes('pixel');
+      const isLaptop    = nl.includes('laptop')||nl.includes('macbook')||nl.includes('notebook')||nl.includes('thinkpad');
+      const isSpeaker   = nl.includes('speaker')||nl.includes('soundbar')||nl.includes('jbl')||nl.includes('bose');
+      const isShoe      = nl.includes('shoe')||nl.includes('sneaker')||nl.includes('air max')||nl.includes('jordan');
 
-        let intro, features, usecases, bullets;
-        const hasF = feats.length >= 1;
+      let intro, features, usecases, bullets;
+      const hasF = feats.length >= 1;
 
-        if (isHeadphone) {
-          intro    = `The ${name} is a headphone designed for ${aud} who want clear, immersive audio.`;
-          features = hasF ? `It features ${feats.join(', ')}.` : `The ${name} delivers balanced stereo sound, includes a built-in microphone for calls, and connects via Bluetooth and 3.5mm jack. It has padded ear cups and a foldable design for portability.`;
-          usecases = `The ${name} works well for commuting, working from home, and gym sessions.`;
-          bullets  = hasF ? feats.map(f=>`${f} — built into the ${name}`) : [`Stereo sound — the ${name} covers full frequency range`,`Built-in mic — take hands-free calls with the ${name}`,`Bluetooth connectivity — the ${name} pairs wirelessly`,`Foldable design — the ${name} packs flat for travel`,`Padded ear cups — the ${name} is comfortable for long sessions`];
-        } else if (isPhone) {
-          intro    = `The ${name} is a smartphone for ${aud} who want a reliable all-day device.`;
-          features = hasF ? `It comes with ${feats.join(', ')}.` : `The ${name} includes a multi-lens camera, a high-resolution display, fast charging, and enough storage for apps and media.`;
-          usecases = `The ${name} handles browsing, streaming, photography, and daily communication without friction.`;
-          bullets  = hasF ? feats.map(f=>`${f} — a standout feature of the ${name}`) : [`Multi-lens camera — the ${name} captures sharp photos`,`Fast charging — the ${name} powers up quickly`,`High-res display — the ${name} delivers clear visuals`,`Ample storage — the ${name} holds apps and media`,`All-day battery — the ${name} lasts a full day`];
-        } else if (isLaptop) {
-          intro    = `The ${name} is a laptop for ${aud} who need reliable computing for work or study.`;
-          features = hasF ? `It is equipped with ${feats.join(', ')}.` : `The ${name} comes with a fast processor, SSD storage, enough RAM for multitasking, and a battery rated for hours of unplugged use.`;
-          usecases = `The ${name} handles document editing, video calls, web browsing, and everyday computing tasks.`;
-          bullets  = hasF ? feats.map(f=>`${f} — a core spec of the ${name}`) : [`Fast processor — the ${name} handles multitasking smoothly`,`SSD storage — the ${name} boots and loads files quickly`,`Portable build — the ${name} is light enough to carry daily`,`Long battery — the ${name} runs for hours unplugged`,`Clear display — the ${name} screen suits extended work sessions`];
-        } else if (isSpeaker) {
-          intro    = `The ${name} is a speaker designed for ${aud} who want quality sound at home or on the go.`;
-          features = hasF ? `It features ${feats.join(', ')}.` : `The ${name} delivers clear, full-range audio with deep bass. It connects via Bluetooth, has a built-in battery for portable use, and is durable enough for outdoor settings.`;
-          usecases = `The ${name} works well for indoor listening, outdoor gatherings, and travel.`;
-          bullets  = hasF ? feats.map(f=>`${f} — a key feature of the ${name}`) : [`Clear audio — the ${name} delivers full-range sound`,`Bluetooth — the ${name} connects wirelessly`,`Built-in battery — the ${name} plays for hours`,`Portable — the ${name} is sized for travel`,`Durable build — the ${name} handles outdoor use`];
-        } else {
-          intro    = hasF ? `The ${name} is a ${cat} for ${aud} built around ${feats[0]}${feats[1]?' and '+feats[1]:''}` : `The ${name} is a ${cat} for ${aud} focused on reliable, practical everyday performance.`;
-          features = hasF ? `It includes ${feats.join(', ')}, making the ${name} a capable choice in its category.` : `The ${name} is built with quality materials and a user-friendly design. It is easy to set up and consistent in daily use.`;
-          usecases = `The ${name} suits ${aud} who need a dependable ${cat} for regular use at home or work.`;
-          bullets  = hasF ? feats.map(f=>`${f} — a defining feature of the ${name}`) : [`Reliable build — the ${name} handles regular use`,`Easy setup — the ${name} is ready to use out of the box`,`Consistent output — the ${name} performs the same every time`,`Built for ${aud} — the ${name} fits daily routines`,`Practical design — the ${name} focuses on what matters`];
-        }
-
-        while (bullets.length < 5) bullets.push(`${cat} quality — the ${name} meets ${brand} standards`);
-
-        setDResult({
-          short_description: intro,
-          long_description: `${intro}\n\n${features}\n\n${usecases}`,
-          bullet_points: bullets.slice(0,5),
-          seo_tags: [name.toLowerCase(), `buy ${name.toLowerCase()}`, `${name.toLowerCase()} review`, `best ${cat} ${new Date().getFullYear()}`, `${name.toLowerCase()} price`, `${brand.toLowerCase()} ${cat}`],
-          _fallback: true,
-        });
-        toast('⚡ Quota exceeded — smart template shown. Add features for better results.', { icon: '⚡', duration: 4000 });
+      if (isHeadphone) {
+        intro    = `The ${name} is a headphone designed for ${aud} who want clear, immersive audio.`;
+        features = hasF ? `It features ${feats.join(', ')}.` : `The ${name} delivers balanced stereo sound, includes a built-in microphone for calls, and connects via Bluetooth and 3.5mm jack. It has padded ear cups and a foldable design for portability.`;
+        usecases = `The ${name} works well for commuting, working from home, and gym sessions.`;
+        bullets  = hasF ? feats.map(f=>`${f} — built into the ${name}`) : [`Stereo sound — the ${name} covers full frequency range`,`Built-in mic — take hands-free calls with the ${name}`,`Bluetooth connectivity — the ${name} pairs wirelessly`,`Foldable design — the ${name} packs flat for travel`,`Padded ear cups — the ${name} is comfortable for long sessions`];
+      } else if (isPhone) {
+        intro    = `The ${name} is a smartphone for ${aud} who want a reliable all-day device.`;
+        features = hasF ? `It comes with ${feats.join(', ')}.` : `The ${name} includes a multi-lens camera, a high-resolution display, fast charging, and enough storage for apps and media.`;
+        usecases = `The ${name} handles browsing, streaming, photography, and daily communication without friction.`;
+        bullets  = hasF ? feats.map(f=>`${f} — a standout feature of the ${name}`) : [`Multi-lens camera — the ${name} captures sharp photos`,`Fast charging — the ${name} powers up quickly`,`High-res display — the ${name} delivers clear visuals`,`Ample storage — the ${name} holds apps and media`,`All-day battery — the ${name} lasts a full day`];
+      } else if (isLaptop) {
+        intro    = `The ${name} is a laptop for ${aud} who need reliable computing for work or study.`;
+        features = hasF ? `It is equipped with ${feats.join(', ')}.` : `The ${name} comes with a fast processor, SSD storage, enough RAM for multitasking, and a battery rated for hours of unplugged use.`;
+        usecases = `The ${name} handles document editing, video calls, web browsing, and everyday computing tasks.`;
+        bullets  = hasF ? feats.map(f=>`${f} — a core spec of the ${name}`) : [`Fast processor — the ${name} handles multitasking smoothly`,`SSD storage — the ${name} boots and loads files quickly`,`Portable build — the ${name} is light enough to carry daily`,`Long battery — the ${name} runs for hours unplugged`,`Clear display — the ${name} screen suits extended work sessions`];
+      } else if (isSpeaker) {
+        intro    = `The ${name} is a speaker designed for ${aud} who want quality sound at home or on the go.`;
+        features = hasF ? `It features ${feats.join(', ')}.` : `The ${name} delivers clear, full-range audio with deep bass. It connects via Bluetooth, has a built-in battery for portable use, and is durable enough for outdoor settings.`;
+        usecases = `The ${name} works well for indoor listening, outdoor gatherings, and travel.`;
+        bullets  = hasF ? feats.map(f=>`${f} — a key feature of the ${name}`) : [`Clear audio — the ${name} delivers full-range sound`,`Bluetooth — the ${name} connects wirelessly`,`Built-in battery — the ${name} plays for hours`,`Portable — the ${name} is sized for travel`,`Durable build — the ${name} handles outdoor use`];
       } else {
-        setDError(msg || 'Generation failed');
-        toast.error('Failed: ' + (msg || 'Unknown error'));
+        intro    = hasF ? `The ${name} is a ${cat} for ${aud} built around ${feats[0]}${feats[1]?' and '+feats[1]:''}` : `The ${name} is a ${cat} for ${aud} focused on reliable, practical everyday performance.`;
+        features = hasF ? `It includes ${feats.join(', ')}, making the ${name} a capable choice in its category.` : `The ${name} is built with quality materials and a user-friendly design. It is easy to set up and consistent in daily use.`;
+        usecases = `The ${name} suits ${aud} who need a dependable ${cat} for regular use at home or work.`;
+        bullets  = hasF ? feats.map(f=>`${f} — a defining feature of the ${name}`) : [`Reliable build — the ${name} handles regular use`,`Easy setup — the ${name} is ready to use out of the box`,`Consistent output — the ${name} performs the same every time`,`Built for ${aud} — the ${name} fits daily routines`,`Practical design — the ${name} focuses on what matters`];
       }
+
+      while (bullets.length < 5) bullets.push(`${cat} quality — the ${name} meets ${brand} standards`);
+
+      setDResult({
+        short_description: intro,
+        long_description: `${intro}\n\n${features}\n\n${usecases}`,
+        bullet_points: bullets.slice(0,5),
+        seo_tags: [name.toLowerCase(), `buy ${name.toLowerCase()}`, `${name.toLowerCase()} review`, `best ${cat} ${new Date().getFullYear()}`, `${name.toLowerCase()} price`, `${brand.toLowerCase()} ${cat}`],
+        _fallback: true,
+      });
+      toast('⚡ Using smart template (AI unavailable). Add features for better results.', { icon: '⚡', duration: 4000 });
     } finally { setDLoading(false); }
   };
 
@@ -243,11 +241,72 @@ export default function ProductAIPage() {
         category:     data.category  || p.category,
         key_features: data.features  || p.key_features,
       }));
-      toast.success('Category & features auto-filled!');
+      
+      if (data._fallback) {
+        toast('⚡ Smart Fill used local detection (AI quota exceeded)', { icon: '⚡', duration: 3000 });
+      } else {
+        toast.success('Category & features auto-filled!');
+      }
     } catch (err) {
+      console.error('Smart Fill error:', err);
       const msg = err.response?.data?.message || err.message || 'unknown error';
-      console.error('Smart Fill error:', msg);
-      toast.error('Smart Fill failed: ' + msg);
+      
+      // Local fallback for Smart Fill
+      const name = dForm.product_name.trim().toLowerCase();
+      const VALID_CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
+        'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
+      
+      // Smart category detection based on keywords
+      const categoryMap = [
+        ['Electronics',    ['electronic','phone','laptop','computer','tech','gadget','camera','tv','audio','headphone','keyboard','device','charger','cable','speaker','console','screen','sony','samsung','apple','macbook','iphone','galaxy','dell','hp','lenovo']],
+        ['Clothing',       ['clothing','apparel','shirt','dress','shoe','pants','jacket','hat','fashion','wear','sock','hoodie','sweater','jean','sneaker','jordan','nike','adidas']],
+        ['Home & Garden',  ['home','garden','furniture','decor','kitchen','bedding','chair','table','lamp','pot','plant','pillow','cutting','knife','ceramic','candle','herb']],
+        ['Beauty & Care',  ['beauty','care','cosmetic','skincare','makeup','perfume','lotion','shampoo','soap','cream','serum','vitamin','shampoo','bar']],
+        ['Sports & Fitness',['sport','fitness','exercise','gym','athletic','yoga','outdoor','running','training','resistance','band','dumbbell','yoga','mat','jump','rope','tennis','racket']],
+        ['Food & Beverage',['food','beverage','drink','snack','grocery','cooking','honey','yoghurt','oats','coffee','olive','oil','milk','juice']],
+        ['Books',          ['book','magazine','journal','read','atomic','habits','deep','work','pragmatic','programmer','sapiens','design','clean','code']],
+        ['Toys',           ['toy','game','play','kids','baby','lego','technic','racing','car','kitty','hello']],
+        ['Automotive',     ['automotive','car','vehicle','auto','tire','engine']],
+        ['Health',         ['health','medical','wellness','care','air','purifier','hepa']],
+      ];
+      
+      let detectedCategory = 'General Merchandise';
+      let detectedFeatures = '';
+      
+      // Find best matching category
+      let bestMatch = { category: 'General Merchandise', score: 0 };
+      for (const [category, keywords] of categoryMap) {
+        const score = keywords.filter(kw => name.includes(kw)).length;
+        if (score > bestMatch.score) {
+          bestMatch = { category, score };
+        }
+      }
+      detectedCategory = bestMatch.category;
+      
+      // Generate features based on category
+      const featureMap = {
+        'Electronics': 'High quality, durable, advanced technology, user-friendly interface, reliable performance',
+        'Clothing': 'Comfortable fit, premium materials, stylish design, breathable fabric, durable construction',
+        'Home & Garden': 'Functional design, quality materials, easy to use, aesthetic appeal, long-lasting',
+        'Beauty & Care': 'Natural ingredients, gentle formula, effective results, safe for daily use, dermatologist tested',
+        'Sports & Fitness': 'Durable materials, ergonomic design, high performance, suitable for all fitness levels, easy to maintain',
+        'Food & Beverage': 'Premium quality, natural ingredients, great taste, nutritious, fresh',
+        'Books': 'Well-written, informative, engaging content, good quality paper, clear print',
+        'Toys': 'Safe materials, educational value, fun and engaging, durable, age-appropriate',
+        'Automotive': 'High quality, reliable performance, easy installation, durable, fits most vehicles',
+        'Health': 'Effective, safe to use, high quality, good results, reliable',
+        'General Merchandise': 'Quality product, reliable performance, good value, easy to use, durable'
+      };
+      
+      detectedFeatures = featureMap[detectedCategory] || featureMap['General Merchandise'];
+      
+      setDForm(p => ({
+        ...p,
+        category: detectedCategory,
+        key_features: detectedFeatures,
+      }));
+      
+      toast('⚡ Smart Fill used local detection', { icon: '⚡', duration: 3000 });
     } finally { setFillLoading(false); }
   };
 
@@ -264,9 +323,57 @@ export default function ProductAIPage() {
       setVResult(data);
       toast.success('Photo analyzed by AI Vision!');
     } catch (err) {
+      console.error('Photo analysis error:', err);
       const msg = err.response?.data?.message || err.message || 'Analysis failed';
-      setVError(msg);
-      toast.error('Analysis failed: ' + msg);
+      
+      // Fallback: Generate basic product info without AI
+      const filename = vFile.name || 'product';
+      const productName = filename.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ').trim();
+      
+      // Simple category detection based on filename
+      const VALID_CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
+        'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];
+      
+      const nameLower = productName.toLowerCase();
+      let detectedCategory = 'General Merchandise';
+      
+      if (nameLower.includes('phone') || nameLower.includes('laptop') || nameLower.includes('camera') || nameLower.includes('speaker')) {
+        detectedCategory = 'Electronics';
+      } else if (nameLower.includes('shirt') || nameLower.includes('dress') || nameLower.includes('shoe')) {
+        detectedCategory = 'Clothing';
+      } else if (nameLower.includes('furniture') || nameLower.includes('kitchen') || nameLower.includes('home')) {
+        detectedCategory = 'Home & Garden';
+      } else if (nameLower.includes('food') || nameLower.includes('drink') || nameLower.includes('honey')) {
+        detectedCategory = 'Food & Beverage';
+      } else if (nameLower.includes('sport') || nameLower.includes('fitness') || nameLower.includes('gym')) {
+        detectedCategory = 'Sports & Fitness';
+      } else if (nameLower.includes('beauty') || nameLower.includes('skin') || nameLower.includes('makeup')) {
+        detectedCategory = 'Beauty & Care';
+      } else if (nameLower.includes('book') || nameLower.includes('magazine')) {
+        detectedCategory = 'Books';
+      } else if (nameLower.includes('toy') || nameLower.includes('game') || nameLower.includes('lego')) {
+        detectedCategory = 'Toys';
+      }
+      
+      setVResult({
+        product_name: productName || 'Unknown Product',
+        category: detectedCategory,
+        tags: [detectedCategory.toLowerCase(), 'product', 'catalog'],
+        short_description: `Product image uploaded: ${productName}`,
+        long_description: `This is a product image for ${productName}. Add more details manually for better cataloging.`,
+        bullet_points: [
+          'Image uploaded successfully',
+          'Category detected based on filename',
+          'Add features manually for better results',
+          'Update product details as needed',
+          'Use AI description generator for detailed content'
+        ],
+        suggested_price_range: '$10-$100',
+        confidence: 'medium',
+        _fallback: true
+      });
+      
+      toast('⚡ Using local analysis (AI unavailable). Update details manually.', { icon: '⚡', duration: 4000 });
     } finally { setVLoading(false); }
   };
 
@@ -280,7 +387,7 @@ export default function ProductAIPage() {
     if (!iForm.product_name.trim()) return toast.error('Enter a product name');
     setILoading(true); setIResults(null); setSelected(null);
     try {
-      // Try AI backend search first (proxied through Express to Python FastAPI)
+      // Try AI backend search first
       let imgs = [];
       try {
         const { data } = await api.post('/ai/search-images', {
@@ -288,15 +395,19 @@ export default function ProductAIPage() {
           category: iForm.category,
         });
         imgs = data.results || [];
-      } catch {
-        // Fallback to local Wikimedia search
+        console.log('AI search results:', imgs);
+      } catch (backendError) {
+        console.error('Backend search failed, using fallback:', backendError);
+        // Fallback to local AI image generation
         imgs = await findImages(iForm.product_name.trim(), iForm.category);
       }
       setIResults(imgs);
       if (imgs.length) setSelected(imgs[0]);
       toast.success(`${imgs.length} images found!`);
-    } catch { toast.error('Image search failed'); }
-    finally { setILoading(false); }
+    } catch (error) {
+      console.error('Image search error:', error);
+      toast.error('Image search failed: ' + (error.message || 'Unknown error'));
+    } finally { setILoading(false); }
   };
 
   const TABS = [

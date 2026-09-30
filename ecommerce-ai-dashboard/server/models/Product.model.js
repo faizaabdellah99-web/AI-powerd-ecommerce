@@ -14,6 +14,12 @@ const ProductSchema = new mongoose.Schema({
   reorderPoint:{ type: Number, default: 10 },  // trigger low-stock alert below this
   isActive:    { type: Boolean, default: true },
 
+  // Smart Pricing fields (stored in MongoDB so they load with the product)
+  cost_price:        { type: Number, default: 0 },     // purchase/cost price
+  competitor_prices: [{ competitor_name: String, price: Number }],  // competitor pricing data
+  demand_trend:      { type: String, enum: ['increasing', 'stable', 'decreasing'], default: 'stable' },
+  days_in_stock:     { type: Number, default: 0 },
+
   // Category-specific fields
   brand:       { type: String, default: '' },          // Electronics
   warranty:    { type: String, default: '' },          // Electronics
@@ -45,8 +51,6 @@ const ProductSchema = new mongoose.Schema({
   // AI-generated content
   aiDescription: { type: String, default: '' },
   aiTags:        [String],
-
-  ratings:  { average: { type: Number, default: 0 }, count: { type: Number, default: 0 } },
 }, { timestamps: true });
 
 // Text index for search
