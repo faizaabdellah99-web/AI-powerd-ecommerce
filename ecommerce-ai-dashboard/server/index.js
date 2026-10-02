@@ -44,6 +44,9 @@ app.use('/api/sales-aggregation', require('./routes/salesAggregation.routes'));
 // ─── Competitor routes ───────────────────────────────────────────────────────
 app.use('/api/competitor',        require('./routes/competitor.routes'));
 
+// ─── Scraper route ────────────────────────────────────────────────────────────
+app.use('/api/scraper',           require('./routes/scraper.routes'));
+
 // ─── Revenue & Top Products routes ───────────────────────────────────────────
 app.use('/api/revenue',           require('./routes/revenue.routes'));
 app.use('/api/top-products',      require('./routes/topProducts.routes'));

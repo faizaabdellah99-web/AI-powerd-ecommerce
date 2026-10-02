@@ -78,33 +78,24 @@ const competitorScraper = async (req, res) => {
 
     // Update product with scraped prices
     if (scrapedPrices.length > 0) {
-      // Merge with existing competitor prices, updating duplicates
+      // Replace old prices for scraped competitors with the freshly scraped ones
       const existingPrices = product.competitor_prices || [];
-      const updatedPrices = [...existingPrices];
       
-      scrapedPrices.forEach(scraped => {
-        const existingIndex = updatedPrices.findIndex(
-          existing => existing.competitor_name === scraped.competitor_name
-        );
-        
-        if (existingIndex >= 0) {
-          updatedPrices[existingIndex] = {
-            ...updatedPrices[existingIndex],
-            price: Math.round(scraped.price * 100) / 100, // Round to 2 decimal places
-            url: scraped.url,
-            scraped_at: scraped.scraped_at
-          };
-        } else {
-          updatedPrices.push({
-            competitor_name: scraped.competitor_name,
-            price: Math.round(scraped.price * 100) / 100, // Round to 2 decimal places
-            url: scraped.url,
-            scraped_at: scraped.scraped_at
-          });
-        }
-      });
-
-      product.competitor_prices = updatedPrices;
+      // Remove old entries for competitors we just scraped
+      const scrapedNames = scrapedPrices.map(s => s.competitor_name);
+      const remainingPrices = existingPrices.filter(
+        existing => !scrapedNames.includes(existing.competitor_name)
+      );
+      
+      // Add freshly scraped prices (rounded to 2 decimal places)
+      const freshPrices = scrapedPrices.map(s => ({
+        competitor_name: s.competitor_name,
+        price: Math.round(s.price * 100) / 100,
+        url: s.url,
+        scraped_at: s.scraped_at
+      }));
+      
+      product.competitor_prices = [...remainingPrices, ...freshPrices];
       await product.save();
     }
 
@@ -205,7 +196,7 @@ async function scrapePriceFromUrl(url, productName) {
     // Fallback: Return a simulated price for demonstration
     const domain = extractDomainFromUrl(url);
     const basePrice = Math.floor(Math.random() * 200) + 20;
-    const price = basePrice + (Math.random() * 50);
+    let price = basePrice + (Math.random() * 50);
     price = Math.round(price * 100) / 100; // Round to 2 decimal places
     console.log(`Error occurred, using simulated price for ${domain}: $${price.toFixed(2)}`);
     return price;

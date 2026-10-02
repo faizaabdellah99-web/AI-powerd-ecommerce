@@ -471,8 +471,8 @@ export default function ShopPage() {
   };
 
   const cartItems = Object.values(cart);
-  const cartCount = cartItems.reduce((s,i) => s + i.qty, 0);
-  const cartTotal = cartItems.reduce((s,i) => s + i.price * i.qty, 0);
+  const cartCount = cartItems.reduce((s,i) => s + (Number(i.qty)||1), 0);
+  const cartTotal = cartItems.reduce((s,i) => s + (Number(i.price)||0) * (Number(i.qty)||1), 0);
 
   const filtered = useMemo(() => {
     let list = allProducts;

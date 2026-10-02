@@ -145,7 +145,7 @@ function OrderRow({ order, onStatusChange, onExpand, expanded }) {
           {order.items?.length} item{order.items?.length !== 1 ? 's' : ''}
         </td>
         <td style={{ padding:'13px 12px', fontSize:14, fontWeight:700, color:'var(--text)' }}>
-          ${order.total?.toFixed(2)}
+          ${(Number(order.total)||0).toFixed(2)}
         </td>
         <td style={{ padding:'13px 12px' }}>
           <span style={{ color:payCfg.color, fontSize:12, fontWeight:700 }}>{payCfg.label}</span>
@@ -180,17 +180,17 @@ function OrderRow({ order, onStatusChange, onExpand, expanded }) {
                 {order.items?.map((item,i)=>(
                   <div key={i} style={{ display:'flex', justifyContent:'space-between', fontSize:13, marginBottom:6, color:'var(--text2)' }}>
                     <span>{item.productName} × {item.qty}</span>
-                    <span style={{ fontWeight:600 }}>${(item.price * item.qty).toFixed(2)}</span>
+                    <span style={{ fontWeight:600 }}>${((Number(item.price)||0) * (Number(item.qty)||1)).toFixed(2)}</span>
                   </div>
                 ))}
                 <div style={{ borderTop:'1px solid var(--border)', marginTop:8, paddingTop:8 }}>
-                  {[['Subtotal',`$${order.subtotal?.toFixed(2)}`],['Shipping',order.shipping===0?'Free':`$${order.shipping?.toFixed(2)}`],['Tax',`$${order.tax?.toFixed(2)}`]].map(([l,v])=>(
+                  {[['Subtotal',`$${(Number(order.subtotal)||0).toFixed(2)}`],['Shipping',Number(order.shipping)===0?'Free':`$${(Number(order.shipping)||0).toFixed(2)}`],['Tax',`$${(Number(order.tax)||0).toFixed(2)}`]].map(([l,v])=>(
                     <div key={l} style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'var(--text3)', marginBottom:3 }}>
                       <span>{l}</span><span>{v}</span>
                     </div>
                   ))}
                   <div style={{ display:'flex', justifyContent:'space-between', fontSize:14, fontWeight:800, color:'var(--primary)', marginTop:6 }}>
-                    <span>Total</span><span>${order.total?.toFixed(2)}</span>
+                    <span>Total</span><span>${(Number(order.total)||0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -363,10 +363,10 @@ export default function AdminOrdersPage() {
   const todayRevenue = isDemo
     ? DEMO_ORDERS
         .filter(o => o.paymentStatus==='paid' && new Date(o.createdAt).toDateString()===new Date().toDateString())
-        .reduce((s,o) => s + (o.total||0), 0)
+        .reduce((s,o) => s + (Number(o.total)||0), 0)
     : orders
         .filter(o => o.paymentStatus==='paid' && new Date(o.createdAt).toDateString()===new Date().toDateString())
-        .reduce((s,o) => s + (o.total||0), 0);
+        .reduce((s,o) => s + (Number(o.total)||0), 0);
 
   return (
     <Layout title="📋 Orders" subtitle="Manage and fulfill customer orders in real time">
@@ -378,7 +378,7 @@ export default function AdminOrdersPage() {
           ['⏳ Pending',  counts.pending,   '#eab308'],
           ['🚚 Shipped',  counts.shipped,   '#f59e0b'],
           ['✅ Delivered',counts.delivered, '#10b981'],
-          ['💰 Today Revenue', `$${todayRevenue.toFixed(2)}`, '#10b981'],
+          ['💰 Today Revenue', `$${(Number(todayRevenue)||0).toFixed(2)}`, '#10b981'],
         ].map(([l,v,c]) => (
           <div key={l} style={{ background:'var(--card)', border:`1px solid ${c}33`, borderRadius:12, padding:'14px 18px' }}>
             <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4 }}>{l}</div>

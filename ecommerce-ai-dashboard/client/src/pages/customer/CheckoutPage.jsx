@@ -16,7 +16,7 @@ export default function CheckoutPage() {
   const { user } = useAuthStore();
 
   const cartItems = location.state?.cartItems || [];
-  const subtotal  = cartItems.reduce((s, i) => s + i.price * i.qty, 0);
+  const subtotal  = cartItems.reduce((s, i) => s + (Number(i.price)||0) * (Number(i.qty)||1), 0);
 
   // ── Customer benefits applied at checkout ─────────────────────────────────────
   const userSegment = location.state?.segment || 'regular'; // passed from ShopPage or fetched
@@ -55,20 +55,15 @@ export default function CheckoutPage() {
     discount = Math.round(subtotal * 0.10 * 100) / 100;
   }
   
-  const discountedSubtotal = subtotal - discount;
+  const discountedSubtotal = Math.max(0, subtotal - discount);
   let shipping = 15;
-  if (isVIPResolved) {
-    shipping = 0;
-  } else if (isRegularResolved && subtotal >= 50) {
-    shipping = 0;
-  } else if (isNewResolved) {
-    shipping = 0; // Free shipping for new customers
-  } else if (subtotal >= 200) {
-    shipping = 0;
-  }
-  
-  const tax  = Math.round(discountedSubtotal * 0.15 * 100) / 100;
-  const total = discountedSubtotal + shipping + tax;
+  if (isVIPResolved)                          { shipping = 0; }
+  else if (isRegularResolved && subtotal >= 50){ shipping = 0; }
+  else if (isNewResolved)                     { shipping = 0; }
+  else if (subtotal >= 200)                   { shipping = 0; }
+
+  const tax   = Math.round(discountedSubtotal * 0.15 * 100) / 100;
+  const total = Math.max(0, Math.round((discountedSubtotal + shipping + tax) * 100) / 100);
 
   console.log('Checkout calculation:', { segKey, isVIPResolved, isRegularResolved, isNewResolved, subtotal, discount, shipping, total });
 

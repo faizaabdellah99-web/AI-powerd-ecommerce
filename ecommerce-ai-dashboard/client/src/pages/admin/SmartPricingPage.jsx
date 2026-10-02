@@ -18,14 +18,103 @@ const EMPTY_FORM = {
   competitor_prices: [],
 };
 
+// ── Per-URL scrape result card ──────────────────────────────────────────────
+function ScrapeResultCard({ result, onAddToCompetitors }) {
+  if (!result) return null;
+  const isSuccess = result.success && result.price;
+
+  return (
+    <div style={{
+      background: isSuccess ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
+      border: `1px solid ${isSuccess ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+      borderRadius: 10,
+      padding: '12px 14px',
+      marginBottom: 10,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          {/* Hostname badge */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <span style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+              padding: '2px 7px', borderRadius: 20,
+              background: isSuccess ? '#10b981' : '#ef4444',
+              color: '#fff',
+            }}>
+              {isSuccess ? '✓ SCRAPED' : '✕ FAILED'}
+            </span>
+            <span style={{ fontSize: 12, color: 'var(--text3)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {result.hostname || result.url}
+            </span>
+          </div>
+
+          {isSuccess ? (
+            <>
+              <div style={{ fontSize: 22, fontWeight: 800, color: '#10b981', marginBottom: 2 }}>
+                ${result.price.toFixed(2)}
+                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--text3)', marginLeft: 6 }}>{result.currency || 'USD'}</span>
+              </div>
+              {result.productName && (
+                <div style={{ fontSize: 12, color: 'var(--text2)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {result.productName}
+                </div>
+              )}
+              {result.scrapedAt && (
+                <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 4 }}>
+                  Scraped: {new Date(result.scrapedAt).toLocaleTimeString()}
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 13, color: '#ef4444', fontWeight: 600, marginBottom: 4 }}>
+                {result.error}
+              </div>
+              {result.tip && (
+                <div style={{ fontSize: 12, color: 'var(--text3)', fontStyle: 'italic' }}>
+                  💡 {result.tip}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Add to competitors button */}
+        {isSuccess && (
+          <button
+            onClick={() => onAddToCompetitors(result)}
+            title="Add to competitor prices list"
+            style={{
+              flexShrink: 0,
+              padding: '6px 12px',
+              background: '#10b981',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 7,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            + Add
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SmartPricingPage() {
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [applying, setApplying] = useState(false);
-  const [scraping, setScraping] = useState(false);
-  const [scrapeUrls, setScrapeUrls] = useState([{ url: '', competitor_name: '' }]);
+
+  // Per-URL scraping state
+  const [scrapeUrls, setScrapeUrls] = useState([{ url: '', competitor_name: '', loading: false, result: null }]);
+  const [scrapingAll, setScrapingAll] = useState(false);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
@@ -162,58 +251,79 @@ export default function SmartPricingPage() {
     const c = [...p.competitor_prices]; c[i] = { ...c[i], [k]: v }; return { ...p, competitor_prices: c };
   });
 
-  // ── Web Scraping Functions ───────────────────────────────────────────────────
-  const addScrapeUrl = () => setScrapeUrls(prev => [...prev, { url: '', competitor_name: '' }]);
-  const updateScrapeUrl = (i, k, v) => setScrapeUrls(prev => {
-    const updated = [...prev];
-    updated[i] = { ...updated[i], [k]: v };
-    return updated;
-  });
-  const removeScrapeUrl = (i) => setScrapeUrls(prev => prev.filter((_, idx) => idx !== i));
+  // ── Per-URL Scraping Functions ────────────────────────────────────────────
+  const addScrapeUrl = () =>
+    setScrapeUrls(prev => [...prev, { url: '', competitor_name: '', loading: false, result: null }]);
 
-  const scrapeCompetitorPrices = async () => {
-    if (!form.product_id) {
-      toast.error('Please select a product first');
+  const removeScrapeUrl = (i) =>
+    setScrapeUrls(prev => prev.filter((_, idx) => idx !== i));
+
+  const updateScrapeUrl = (i, k, v) =>
+    setScrapeUrls(prev => {
+      const u = [...prev];
+      u[i] = { ...u[i], [k]: v, result: null }; // clear result when URL changes
+      return u;
+    });
+
+  // Scrape a single URL and show its result inline
+  const scrapeSingleUrl = async (i) => {
+    const entry = scrapeUrls[i];
+    if (!entry.url.trim()) {
+      toast.error('Please enter a URL first');
       return;
     }
-
-    const validUrls = scrapeUrls.filter(u => u.url.trim() !== '');
-    if (validUrls.length === 0) {
-      toast.error('Please add at least one competitor URL');
-      return;
-    }
-
-    setScraping(true);
+    setScrapeUrls(prev => {
+      const u = [...prev];
+      u[i] = { ...u[i], loading: true, result: null };
+      return u;
+    });
     try {
-      const { data } = await api.post('/competitor/scrape', {
-        product_id: form.product_id,
-        competitor_urls: validUrls
+      const { data } = await api.post('/scraper/scrape-price', { url: entry.url.trim() });
+      setScrapeUrls(prev => {
+        const u = [...prev];
+        u[i] = { ...u[i], loading: false, result: data };
+        return u;
       });
-
-      // Update form with scraped prices
-      if (data.updated_competitor_prices && data.updated_competitor_prices.length > 0) {
-        setForm(p => ({ 
-          ...p, 
-          competitor_prices: data.updated_competitor_prices.map(c => ({
-            ...c,
-            price: c.price ? Math.round(c.price * 100) / 100 : 0
-          }))
-        }));
-        toast.success(`Successfully scraped ${data.scraped_prices.length} competitor prices!`);
-      }
-
-      if (data.errors && data.errors.length > 0) {
-        const errorDetails = data.errors.map(e => `${e.competitor}: ${e.error}`).join('\n');
-        toast.error(`Failed to scrape ${data.errors.length} URLs:\n${errorDetails}`, { duration: 8000 });
-        console.error('Scraping errors:', data.errors);
+      if (data.success) {
+        toast.success(`Got $${data.price} from ${data.hostname}`);
+      } else {
+        toast.error(data.error || 'Could not extract price');
       }
     } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to scrape competitor prices';
+      const msg = err.response?.data?.error || 'Scrape request failed';
+      setScrapeUrls(prev => {
+        const u = [...prev];
+        u[i] = { ...u[i], loading: false, result: { success: false, url: entry.url, hostname: entry.url, error: msg, tip: 'Enter the price manually below.' } };
+        return u;
+      });
       toast.error(msg);
-      console.error('Scraping error:', err);
-    } finally {
-      setScraping(false);
     }
+  };
+
+  // Scrape ALL urls that have a URL filled in
+  const scrapeAllUrls = async () => {
+    const filled = scrapeUrls.map((u, i) => ({ ...u, idx: i })).filter(u => u.url.trim());
+    if (!filled.length) { toast.error('Add at least one URL first'); return; }
+    setScrapingAll(true);
+    await Promise.all(filled.map(u => scrapeSingleUrl(u.idx)));
+    setScrapingAll(false);
+    toast.success('All URLs scraped!');
+  };
+
+  // Add a successful scrape result into the competitor_prices list
+  const addScrapedToCompetitors = (scrapeResult) => {
+    const name = scrapeUrls.find(u => u.url === scrapeResult.url)?.competitor_name
+      || scrapeResult.hostname
+      || scrapeResult.productName
+      || 'Competitor';
+    setForm(p => ({
+      ...p,
+      competitor_prices: [
+        ...p.competitor_prices.filter(c => c.competitor_name !== name),
+        { competitor_name: name, price: scrapeResult.price },
+      ],
+    }));
+    toast.success(`Added ${name} → $${scrapeResult.price} to competitor list`);
   };
 
   const changeColor = result ? (result.price_change_pct > 0 ? '#10b981' : result.price_change_pct < 0 ? '#ef4444' : '#f59e0b') : '';
@@ -300,43 +410,93 @@ export default function SmartPricingPage() {
           </Card>
 
           <Card style={{ marginBottom: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>🌐 Auto-Scrape Competitor Prices</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <div style={{ fontSize: 15, fontWeight: 600 }}>🌐 Scrape Competitor Prices</div>
               <Button variant="ghost" size="sm" onClick={addScrapeUrl}>+ Add URL</Button>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 12 }}>
-              Automatically fetch competitor prices from their websites by entering product page URLs.
+            <div style={{ fontSize: 12, color: 'var(--text3)', marginBottom: 14 }}>
+              Paste competitor product page URLs — each URL is scraped individually and results are shown below.
             </div>
-            {scrapeUrls.map((u, i) => (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr auto', gap: 8, marginBottom: 8 }}>
-                <input
-                  placeholder="Competitor name (optional)"
-                  value={u.competitor_name}
-                  onChange={e => updateScrapeUrl(i, 'competitor_name', e.target.value)}
-                />
-                <input
-                  placeholder="Product page URL (https://...)"
-                  value={u.url}
-                  onChange={e => updateScrapeUrl(i, 'url', e.target.value)}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeScrapeUrl(i)}
-                  style={{ color: '#ef4444' }}
-                >
-                  ✕
-                </Button>
+
+            {scrapeUrls.map((entry, i) => (
+              <div key={i} style={{ marginBottom: 14 }}>
+                {/* URL row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr auto auto', gap: 8, alignItems: 'center', marginBottom: 6 }}>
+                  <input
+                    placeholder="Name (optional)"
+                    value={entry.competitor_name}
+                    onChange={e => updateScrapeUrl(i, 'competitor_name', e.target.value)}
+                    style={{ fontSize: 13 }}
+                  />
+                  <input
+                    placeholder="https://shop.com/product/..."
+                    value={entry.url}
+                    onChange={e => updateScrapeUrl(i, 'url', e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && scrapeSingleUrl(i)}
+                    style={{ fontSize: 13 }}
+                  />
+                  {/* Per-URL scrape button */}
+                  <button
+                    onClick={() => scrapeSingleUrl(i)}
+                    disabled={entry.loading || !entry.url.trim()}
+                    title="Scrape this URL"
+                    style={{
+                      padding: '6px 12px',
+                      background: entry.loading ? 'var(--border)' : 'var(--primary)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: 7,
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: entry.loading || !entry.url.trim() ? 'not-allowed' : 'pointer',
+                      whiteSpace: 'nowrap',
+                      opacity: !entry.url.trim() ? 0.5 : 1,
+                    }}
+                  >
+                    {entry.loading ? '⏳' : '🔍'}
+                  </button>
+                  <button
+                    onClick={() => removeScrapeUrl(i)}
+                    title="Remove"
+                    style={{
+                      padding: '6px 10px',
+                      background: 'transparent',
+                      color: '#ef4444',
+                      border: '1px solid rgba(239,68,68,0.3)',
+                      borderRadius: 7,
+                      fontSize: 13,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Individual result card for this URL */}
+                {entry.loading && (
+                  <div style={{ padding: '10px 14px', background: 'var(--bg3)', borderRadius: 8, fontSize: 13, color: 'var(--text2)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ animation: 'spin 1s linear infinite', display: 'inline-block' }}>⏳</span>
+                    Fetching {entry.url.length > 50 ? entry.url.slice(0, 50) + '…' : entry.url}
+                  </div>
+                )}
+                {!entry.loading && entry.result && (
+                  <ScrapeResultCard
+                    result={entry.result}
+                    onAddToCompetitors={addScrapedToCompetitors}
+                  />
+                )}
               </div>
             ))}
+
+            {/* Scrape All button */}
             <Button
-              onClick={scrapeCompetitorPrices}
-              loading={scraping}
-              disabled={!form.product_id || scrapeUrls.every(u => !u.url.trim())}
+              onClick={scrapeAllUrls}
+              loading={scrapingAll}
+              disabled={scrapingAll || scrapeUrls.every(u => !u.url.trim())}
               variant="primary"
-              style={{ width: '100%', marginTop: 8 }}
+              style={{ width: '100%', marginTop: 4, justifyContent: 'center' }}
             >
-              {scraping ? '🔄 Scraping...' : '🔍 Scrape Prices from URLs'}
+              {scrapingAll ? '🔄 Scraping All URLs…' : `🔍 Scrape All URLs (${scrapeUrls.filter(u => u.url.trim()).length})`}
             </Button>
           </Card>
 

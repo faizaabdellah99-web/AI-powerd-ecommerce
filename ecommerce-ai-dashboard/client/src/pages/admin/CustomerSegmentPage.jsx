@@ -83,12 +83,12 @@ export default function CustomerSegmentPage() {
         orders.forEach(o => (o.items||[]).forEach(item => {
           const c = item.category || 'Other';
           catMap[c] = catMap[c] || { category:c, revenue:0, orders:0, qty:0 };
-          catMap[c].revenue += (item.price||0) * (item.qty||1);
+          catMap[c].revenue += (Number(item.price)||0) * (Number(item.qty)||1);
           catMap[c].orders++;
           catMap[c].qty += (item.qty||1);
         }));
         const catArr = Object.values(catMap).sort((a,b) => b.revenue - a.revenue);
-        const total  = catArr.reduce((s,c) => s + c.revenue, 0);
+        const total  = catArr.reduce((s,c) => s + (Number(c.revenue)||0), 0);
         catArr.forEach(c => c.pct = total > 0 ? +((c.revenue/total)*100).toFixed(1) : 0);
         setSalesData({ categories:catArr, total, orderCount:orders.length });
         setStats(p => ({...p, categorySales: total}));
@@ -370,7 +370,7 @@ export default function CustomerSegmentPage() {
                           <span style={{ fontSize:13,fontWeight:600,color:'var(--text)' }}>{c.category}</span>
                         </div>
                       </td>
-                      <td style={{ padding:'12px',fontSize:13,fontWeight:700,color:'var(--success)' }}>${c.revenue.toFixed(2)}</td>
+                      <td style={{ padding:'12px',fontSize:13,fontWeight:700,color:'var(--success)' }}>${(Number(c.revenue)||0).toFixed(2)}</td>
                       <td style={{ padding:'12px',fontSize:13,color:'var(--text2)' }}>{c.orders}</td>
                       <td style={{ padding:'12px',fontSize:13,color:'var(--text2)' }}>{c.qty}</td>
                       <td style={{ padding:'12px' }}>

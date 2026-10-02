@@ -52,7 +52,7 @@ export default function OrderConfirmedPage() {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginBottom:14 }}>
             {[
               ['📦 Items',    `${cartItems.length} item${cartItems.length>1?'s':''}`],
-              ['💰 Total',    `$${total.toFixed(2)}`],
+              ['💰 Total',    `$${(Number(total)||0).toFixed(2)}`],
               ['💳 Payment',  PAY_LABELS[payMethod] || payMethod],
               ['📍 Delivery', address?.city || 'Addis Ababa'],
             ].map(([l,v])=>(

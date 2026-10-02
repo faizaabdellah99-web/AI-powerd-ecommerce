@@ -21,7 +21,7 @@ export default function ProductsPage() {
   const [imagePreview, setImagePreview] = useState(null);
   const imageInputRef = useRef(null);
   const [form, setForm] = useState({
-    name:'', category:'', price:'', stock:'', description:'',
+    name:'', category:'', price:'', cost_price:'', stock:'', description:'',
     reorderPoint:'10', sizes:'', colors:'', brand:'', warranty:'',
     expiryDate:'', isPerishable:false,
   });
@@ -45,7 +45,7 @@ export default function ProductsPage() {
     setEditProd(null);
     setImageFile(null);
     setImagePreview(null);
-    setForm({ name:'', category:'', price:'', stock:'', description:'', reorderPoint:'10', sizes:'', colors:'', brand:'', warranty:'', expiryDate:'', isPerishable:false });
+    setForm({ name:'', category:'', price:'', cost_price:'', stock:'', description:'', reorderPoint:'10', sizes:'', colors:'', brand:'', warranty:'', expiryDate:'', isPerishable:false });
     setShowModal(true);
   };
 
@@ -57,6 +57,7 @@ export default function ProductsPage() {
       name:        p.name       || '',
       category:    p.category   || '',
       price:       p.price      || '',
+      cost_price:  p.cost_price || '',
       stock:       p.stock      || '',
       description: p.description|| '',
       brand:       p.brand      || '',
@@ -90,6 +91,7 @@ export default function ProductsPage() {
         name:        form.name,
         category:    form.category,
         price:       +form.price,
+        cost_price:  +form.cost_price || 0,
         stock:       +form.stock || 0,
         reorderPoint:+form.reorderPoint || 10,
         description: form.description,
@@ -191,7 +193,7 @@ export default function ProductsPage() {
           <table style={{ width:'100%', borderCollapse:'collapse' }}>
             <thead>
               <tr style={{ borderBottom:'1px solid var(--border)', background:'var(--bg3)' }}>
-                {['Product','Category','Price','Stock','Status','Actions'].map(h=>(
+                {['Product','Category','Price','Cost','Stock','Status','Actions'].map(h=>(
                   <th key={h} style={{ textAlign:'left', padding:'10px 12px', fontSize:11, color:'var(--text3)', fontWeight:600, letterSpacing:0.5 }}>{h}</th>
                 ))}
               </tr>
@@ -222,6 +224,14 @@ export default function ProductsPage() {
                   </td>
                   <td style={{ padding:'13px 12px', fontSize:13, color:'var(--text2)' }}>{p.category}</td>
                   <td style={{ padding:'13px 12px', fontSize:14, fontWeight:700, color:'var(--text)' }}>${p.price?.toFixed(2)}</td>
+                  <td style={{ padding:'13px 12px', fontSize:13, color:'var(--text3)' }}>
+                    {p.cost_price ? `$${p.cost_price.toFixed(2)}` : '—'}
+                    {p.cost_price > 0 && p.price > 0 && (
+                      <div style={{ fontSize:10, color: p.price > p.cost_price ? 'var(--success)' : 'var(--danger)', marginTop:1 }}>
+                        {((p.price - p.cost_price) / p.price * 100).toFixed(0)}% margin
+                      </div>
+                    )}
+                  </td>
                   <td style={{ padding:'13px 12px' }}>
                     <span style={{ fontSize:14, fontWeight:600, color: p.stock===0?'var(--danger)': p.stock<10?'var(--warning)':'var(--text)' }}>
                       {p.stock===0 ? '⚠️ Out of stock' : p.stock}
@@ -312,7 +322,7 @@ export default function ProductsPage() {
 
             {/* Base fields */}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-              {[['Product Name *','name','text'],['Price ($) *','price','number'],['Stock Qty','stock','number'],['Reorder Point','reorderPoint','number']].map(([l,k,t])=>(
+              {[['Product Name *','name','text'],['Price ($) *','price','number'],['Cost Price ($)','cost_price','number'],['Stock Qty','stock','number'],['Reorder Point','reorderPoint','number']].map(([l,k,t])=>(
                 <div key={k} style={{ gridColumn: k==='name'?'1/-1':'auto' }}>
                   <label style={{ fontSize:12, color:'var(--text2)', display:'block', marginBottom:5, fontWeight:500 }}>{l}</label>
                   <input type={t} value={form[k]} onChange={e=>setForm(p=>({...p,[k]:e.target.value}))} />
