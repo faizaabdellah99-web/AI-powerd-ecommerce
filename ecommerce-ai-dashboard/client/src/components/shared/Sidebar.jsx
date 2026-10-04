@@ -57,17 +57,9 @@ export default function Sidebar() {
   const { newOrderCount, recentOrders, topCustomers, setTopCustomers } = useOrderStore();
   const [showOrderPanel, setShowOrderPanel] = useState(false);
   const [showCustomerPanel, setShowCustomerPanel] = useState(false);
-  const [expandedMenus, setExpandedMenus] = useState({});
   const [orderStats, setOrderStats] = useState({ pending: 0, today: 0, total: 0, totalRevenue: 0 });
   const [feedbackUnread, setFeedbackUnread] = useState(0); // admin: new feedback count
   const [replyUnread, setReplyUnread] = useState(0);       // customer: unread admin replies
-
-  // Auto-expand Product AI menu if on a product-ai sub-page
-  useEffect(() => {
-    if (location.pathname === '/admin/product-ai' && location.search.includes('tab=')) {
-      setExpandedMenus(prev => ({ ...prev, '/admin/product-ai': true }));
-    }
-  }, [location.pathname, location.search]);
 
   // Reset badge when visiting Orders page
   useEffect(() => {
@@ -190,20 +182,6 @@ export default function Sidebar() {
 
   const handleLogout = () => { logout(); navigate('/login'); };
 
-  const toggleMenu = (path) => {
-    setExpandedMenus(prev => ({ ...prev, [path]: !prev[path] }));
-  };
-
-  const isActive = (path) => {
-    if (path.includes('?')) {
-      const [base, qs] = path.split('?');
-      const param = new URLSearchParams(qs);
-      const currentParams = new URLSearchParams(location.search);
-      return location.pathname === base && currentParams.get('tab') === param.get('tab');
-    }
-    return location.pathname === path;
-  };
-
   return (
     <aside style={{
       width: 240, minHeight: '100vh', background: 'var(--bg2)',
@@ -228,83 +206,42 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
-        {nav.map(item => {
-          const hasSubItems = item.subItems && item.subItems.length > 0;
-          const isExpanded = expandedMenus[item.path];
-          const isParentActive = location.pathname === item.path && !location.search.includes('tab=');
-
-          return (
-            <div key={item.path}>
-              {/* Parent nav item */}
-              <div style={{ display: 'flex', alignItems: 'center' }}>
-                <NavLink to={hasSubItems ? '#' : item.path} end={item.path.split('/').length === 2}
-                  onClick={hasSubItems ? (e) => { e.preventDefault(); toggleMenu(item.path); } : undefined}
-                  style={({ isActive: active }) => ({
-                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-                    borderRadius: 8, marginBottom: 2, fontSize: 14, fontWeight: 500,
-                    color: (isParentActive || (hasSubItems && location.pathname === item.path && location.search.includes('tab='))) ? '#fff' : 'var(--text2)',
-                    background: (isParentActive || (hasSubItems && location.pathname === item.path && location.search.includes('tab='))) ? 'var(--primary)' : 'transparent',
-                    transition: 'all 0.15s',
-                    textDecoration: 'none', flex: 1,
-                  })}
-                >
-                  <span style={{ fontSize: 16 }}>{item.icon}</span>
-                  <span style={{ flex: 1 }}>{item.label}</span>
-                  {/* Orders badge */}
-                  {(item.label === 'Orders' && user?.role !== 'customer' && newOrderCount > 0) && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                      background: '#10b981', color: '#fff', letterSpacing: 0.5,
-                    }}>{newOrderCount}</span>
-                  )}
-                  {/* Admin Feedback badge — unread count */}
-                  {(item.label === 'Feedback' && (user?.role === 'admin' || user?.role === 'vendor') && feedbackUnread > 0) && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                      background: '#ef4444', color: '#fff', letterSpacing: 0.5,
-                    }}>{feedbackUnread > 99 ? '99+' : feedbackUnread}</span>
-                  )}
-                  {/* Customer Feedback badge — unread replies count */}
-                  {(item.label === 'Feedback' && user?.role === 'customer' && replyUnread > 0) && (
-                    <span style={{
-                      fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                      background: '#f59e0b', color: '#fff', letterSpacing: 0.5,
-                    }}>{replyUnread > 99 ? '99+' : replyUnread}</span>
-                  )}
-                </NavLink>
-                {hasSubItems && (
-                  <button onClick={() => toggleMenu(item.path)} style={{
-                    background: 'none', border: 'none', color: 'var(--text3)', cursor: 'pointer',
-                    padding: '10px 8px', fontSize: 10, display: 'flex', alignItems: 'center',
-                  }}>
-                    <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>▼</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Sub-items */}
-              {hasSubItems && isExpanded && (
-                <div style={{ marginLeft: 8, marginBottom: 4, borderLeft: '1px solid var(--border)', paddingLeft: 8 }}>
-                  {item.subItems.map(sub => (
-                    <NavLink key={sub.path} to={sub.path}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px',
-                        borderRadius: 6, marginBottom: 1, fontSize: 13, fontWeight: 400,
-                        color: isActive(sub.path) ? '#fff' : 'var(--text2)',
-                        background: isActive(sub.path) ? 'var(--primary)' : 'transparent',
-                        transition: 'all 0.15s',
-                        textDecoration: 'none',
-                      }}
-                    >
-                      <span style={{ fontSize: 13 }}>{sub.icon}</span>
-                      <span style={{ flex: 1 }}>{sub.label}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {nav.map(item => (
+          <NavLink key={item.path} to={item.path} end={item.path.split('/').length === 2}
+            style={({ isActive: active }) => ({
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+              borderRadius: 8, marginBottom: 2, fontSize: 14, fontWeight: 500,
+              color: active ? '#fff' : 'var(--text2)',
+              background: active ? 'var(--primary)' : 'transparent',
+              transition: 'all 0.15s',
+              textDecoration: 'none',
+            })}
+          >
+            <span style={{ fontSize: 16 }}>{item.icon}</span>
+            <span style={{ flex: 1 }}>{item.label}</span>
+            {/* Orders badge */}
+            {(item.label === 'Orders' && user?.role !== 'customer' && newOrderCount > 0) && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
+                background: '#10b981', color: '#fff', letterSpacing: 0.5,
+              }}>{newOrderCount}</span>
+            )}
+            {/* Admin Feedback badge — unread count */}
+            {(item.label === 'Feedback' && (user?.role === 'admin' || user?.role === 'vendor') && feedbackUnread > 0) && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
+                background: '#ef4444', color: '#fff', letterSpacing: 0.5,
+              }}>{feedbackUnread > 99 ? '99+' : feedbackUnread}</span>
+            )}
+            {/* Customer Feedback badge — unread replies count */}
+            {(item.label === 'Feedback' && user?.role === 'customer' && replyUnread > 0) && (
+              <span style={{
+                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
+                background: '#f59e0b', color: '#fff', letterSpacing: 0.5,
+              }}>{replyUnread > 99 ? '99+' : replyUnread}</span>
+            )}
+          </NavLink>
+        ))}
 
         {/* ── Order Stats Panel (Admin/Vendor only) ── */}
         {user?.role !== 'customer' && (

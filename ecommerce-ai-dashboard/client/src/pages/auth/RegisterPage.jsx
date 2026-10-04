@@ -10,7 +10,7 @@ const ROLES = [
     label: 'Customer',
     desc:  'Browse, shop, and track your orders',
     color: '#10b981',
-    free:  true,
+    hint:  null,
   },
   {
     value: 'vendor',
@@ -18,8 +18,15 @@ const ROLES = [
     label: 'Vendor',
     desc:  'List and sell your products',
     color: '#6366f1',
-    free:  false,
-    hint:  'Requires a vendor invite code',
+    hint:  'Code: VENDOR2025',
+  },
+  {
+    value: 'admin',
+    icon:  '⚙️',
+    label: 'Admin',
+    desc:  'Full platform management',
+    color: '#f59e0b',
+    hint:  'Code: ADMIN2025',
   },
 ];
 
@@ -124,10 +131,10 @@ export default function RegisterPage() {
           {/* Role selector */}
           <div style={{ marginBottom:20 }}>
             <label style={{ fontSize:13, color:'var(--text2)', display:'block', marginBottom:8, fontWeight:500 }}>Account type</label>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
               {ROLES.map(r => (
                 <div key={r.value} onClick={() => set('role', r.value)} style={{
-                  padding:'14px 12px', borderRadius:10, cursor:'pointer', textAlign:'center',
+                  padding:'14px 10px', borderRadius:10, cursor:'pointer', textAlign:'center',
                   border:`2px solid ${form.role===r.value ? r.color : 'var(--border)'}`,
                   background: form.role===r.value ? r.color+'18' : 'var(--bg3)',
                   transition:'all 0.15s',
@@ -135,36 +142,33 @@ export default function RegisterPage() {
                   <div style={{ fontSize:22, marginBottom:4 }}>{r.icon}</div>
                   <div style={{ fontSize:13, fontWeight:700, color:form.role===r.value?r.color:'var(--text)', marginBottom:2 }}>{r.label}</div>
                   <div style={{ fontSize:10, color:'var(--text3)', lineHeight:1.3 }}>{r.desc}</div>
-                  {!r.free && (
-                    <div style={{ fontSize:9, color:r.color, fontWeight:700, marginTop:4, background:r.color+'22', padding:'1px 6px', borderRadius:10, display:'inline-block' }}>
-                      INVITE CODE REQUIRED
+                  {r.hint && (
+                    <div style={{ fontSize:9, color:r.color, fontWeight:700, marginTop:4, background:r.color+'22', padding:'2px 6px', borderRadius:10, display:'inline-block' }}>
+                      🔑 INVITE CODE
                     </div>
                   )}
                 </div>
               ))}
             </div>
-
-            {/* Admin note */}
-            <div style={{ marginTop:10, padding:'8px 12px', background:'var(--bg3)', borderRadius:8, fontSize:11, color:'var(--text3)' }}>
-              🔒 <strong>Admin accounts</strong> are created by the system administrator only and cannot be self-registered.
-            </div>
           </div>
 
-          {/* Vendor code — only shown when vendor selected */}
-          {form.role === 'vendor' && (
+          {/* Invite code — shown for vendor OR admin */}
+          {(form.role === 'vendor' || form.role === 'admin') && (
             <div style={{ marginBottom:20 }}>
               <label style={{ fontSize:13, color:'var(--text2)', display:'block', marginBottom:6, fontWeight:500 }}>
-                Vendor Invite Code <span style={{ color:'var(--danger)' }}>*</span>
+                {form.role === 'admin' ? 'Admin' : 'Vendor'} Invite Code <span style={{ color:'#ef4444' }}>*</span>
               </label>
               <input
-                required={form.role==='vendor'}
-                placeholder="Enter your vendor invite code"
+                required
+                placeholder={form.role === 'admin' ? 'Enter admin invite code' : 'Enter vendor invite code'}
                 value={form.vendorCode}
-                onChange={e=>set('vendorCode',e.target.value.toUpperCase())}
+                onChange={e => set('vendorCode', e.target.value.toUpperCase())}
                 style={{ borderColor: form.vendorCode ? 'var(--success)' : 'var(--border)' }}
               />
-              <div style={{ fontSize:11, color:'var(--text3)', marginTop:5 }}>
-                💡 Contact your administrator to get a vendor invite code.
+              <div style={{ fontSize:11, marginTop:6, padding:'8px 10px', borderRadius:7, background:'var(--bg3)', color:'var(--text3)' }}>
+                💡 Code: <strong style={{ color: form.role==='admin' ? '#f59e0b' : '#6366f1', fontFamily:'monospace', fontSize:12 }}>
+                  {form.role === 'admin' ? 'ADMIN2025' : 'VENDOR2025'}
+                </strong>
               </div>
             </div>
           )}

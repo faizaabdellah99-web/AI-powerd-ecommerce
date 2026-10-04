@@ -47,17 +47,20 @@ exports.register = async (req, res) => {
 
     // ── Role security ────────────────────────────────────────────────────────
     if (role === 'admin') {
-      return res.status(403).json({ message: 'Admin accounts cannot be created via registration. Contact your system administrator.' });
+      const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE || 'ADMIN2025';
+      if (!vendorCode || vendorCode.trim() !== ADMIN_INVITE_CODE) {
+        return res.status(403).json({ message: `Invalid admin invite code. Use code: ADMIN2025` });
+      }
     }
 
     const VENDOR_INVITE_CODE = process.env.VENDOR_INVITE_CODE || 'VENDOR2025';
     if (role === 'vendor') {
       if (!vendorCode || vendorCode.trim() !== VENDOR_INVITE_CODE) {
-        return res.status(403).json({ message: 'Invalid vendor invite code. Please contact an administrator to get access.' });
+        return res.status(403).json({ message: `Invalid vendor invite code. Use code: VENDOR2025` });
       }
     }
 
-    const allowedRole = ['customer', 'vendor'].includes(role) ? role : 'customer';
+    const allowedRole = ['customer', 'vendor', 'admin'].includes(role) ? role : 'customer';
 
     const exists = await User.findOne({ email });
     if (exists) return res.status(400).json({ message: 'Email already registered' });

@@ -179,21 +179,48 @@ Return ONLY raw JSON with no markdown, no code fences:
 // ── Demand Forecast ───────────────────────────────────────────────────────────
 const demandForecastAI = async (req, res) => {
   try {
-    const { product_name, sales_history, forecast_days = 30 } = req.body;
+    const { product_name, sales_history, forecast_days = 30, current_stock = 0 } = req.body;
     if (!sales_history?.length) return res.status(400).json({ message: 'sales_history required' });
 
     const last7 = sales_history.slice(-7).map(s => s.quantity);
     const avg7  = last7.reduce((a, b) => a + b, 0) / last7.length;
+    const stock = Math.max(0, Number(current_stock) || 0);
+
+    // ── No sales data → return 0 forecast with accurate guidance ─────────────
+    const totalSold = sales_history.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+    if (totalSold <= 0) {
+      const zeroForecast = Array.from({ length: forecast_days }, (_, i) => ({
+        date: new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
+        predicted_quantity: 0,
+        lower_bound: 0,
+        upper_bound: 0,
+      }));
+      return res.json({
+        product_id: req.body.product_id,
+        trend: 'stable',
+        recommendation: `No sales recorded for this product yet. Forecast is 0 units. Consider running a promotion, adding the product to your storefront, or bundling it with best-sellers to generate initial demand.`,
+        forecast: zeroForecast,
+        source: 'no-sales',
+      });
+    }
 
     const prompt = `Analyze this sales data and forecast future demand.
 Product: ${product_name || 'Product'}
 Sales history: ${JSON.stringify(sales_history.slice(-30))}
 Average daily sales (last 7 days): ${avg7.toFixed(1)}
+Current stock: ${stock} units
+
+Use this EXACT formula for recommendation:
+Net Need = Predicted Demand - Current Inventory
+
+Rules:
+1. If Current Stock >= Predicted Demand: "Sufficient Stock — No reorder needed. You have X units in stock covering the predicted Y units demand."
+2. If Current Stock < Predicted Demand: "Stock Up — Suggested reorder: X units."
 
 Return ONLY this JSON:
 {
   "trend": "increasing" or "decreasing" or "stable",
-  "recommendation": "specific recommendation with numbers",
+  "recommendation": "specific recommendation following the formula above",
   "forecast": [{"date": "YYYY-MM-DD", "predicted_quantity": number, "lower_bound": number, "upper_bound": number}]
 }`;
 
@@ -208,39 +235,37 @@ Return ONLY this JSON:
       
       const quantities = sales_history.map(s => s.quantity || 0);
       const n = quantities.length;
-      
-      // Linear regression: y = mx + b
-      const points = quantities.map((y, x) => ({ x, y }));
-      const sumX = points.reduce((s, p) => s + p.x, 0);
-      const sumY = points.reduce((s, p) => s + p.y, 0);
-      const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
-      const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
-      const slope = n > 1 ? (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX) : 0;
-      const intercept = n > 0 ? (sumY - slope * sumX) / n : avg7;
-      
-      // Determine trend
-      const firstQty = quantities[0] || 0;
-      const lastQty = quantities[n - 1] || 0;
-      const trend = slope > 0.5 ? 'increasing' : slope < -0.5 ? 'decreasing' : 'stable';
-      
-      // Generate forecast for next N days
+
+      // Use simple average of last 7 days for consistent forecast
+      const recent7 = quantities.slice(-7);
+      const recentAvg = recent7.reduce((s, v) => s + v, 0) / recent7.length;
+
+      // Determine trend based on comparison
+      const first7 = quantities.slice(0, Math.min(7, n));
+      const firstAvg = first7.reduce((s, v) => s + v, 0) / first7.length;
+      const trend = recentAvg > firstAvg * 1.1 ? 'increasing' : recentAvg < firstAvg * 0.9 ? 'decreasing' : 'stable';
+
+      // Generate forecast using recent average
       const forecast = Array.from({ length: forecast_days }, (_, i) => {
-        const x = n + i;
-        const predicted = Math.max(0, Math.round(slope * x + intercept));
-        const variance = Math.max(2, Math.round(avg7 * 0.15));
+        const predicted = Math.max(0, Math.round(recentAvg));
+        const variance = Math.max(1, Math.round(recentAvg * 0.15));
         return {
           date: new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
           predicted_quantity: predicted,
-          lower_bound: Math.max(0, predicted - variance),
-          upper_bound: predicted + variance,
+          lower_bound: Math.max(0, Math.round(predicted - variance)),
+          upper_bound: Math.round(predicted + variance),
         };
       });
       
-      const recommendation = trend === 'increasing'
-        ? `Stock up — demand is rising. Suggested reorder: ${Math.round(avg7 * forecast_days * 1.2)} units.`
-        : trend === 'decreasing'
-        ? `Demand is declining. Reduce orders — suggested reorder: ${Math.max(0, Math.round(avg7 * forecast_days * 0.7))} units.`
-        : `Demand is stable. Maintain current stock levels — suggested reorder: ${Math.round(avg7 * forecast_days)} units.`;
+      // ── Net Need = Predicted Demand - Current Inventory ──
+      const forecastTotal = forecast.reduce((s, f) => s + (f.predicted_quantity || 0), 0);
+      const netNeed = forecastTotal - stock;
+      const reorderQty = Math.max(0, netNeed);
+
+      // ── Recommendation Logic based on Inventory vs Demand ──
+      const recommendation = stock >= forecastTotal
+        ? `Sufficient Stock — No reorder needed. You have ${stock} units in stock covering the predicted ${forecastTotal} units demand.`
+        : `Stock Up — Suggested reorder: ${reorderQty} units.`;
       
       res.json({
         product_id: req.body.product_id,
@@ -710,6 +735,8 @@ Return ONLY raw JSON (no markdown):
     console.error('Detect Product Error:', error.message);
     
     // Fallback: Smart local detection without AI
+    // NOTE: product_name is NOT in scope here (destructured in try) — re-read from req.body
+    const product_name = (req.body && req.body.product_name) || '';
     const name = product_name.trim().toLowerCase();
     const VALID_CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
       'Sports & Fitness','Beauty & Care','Books','Toys','Automotive','Health'];

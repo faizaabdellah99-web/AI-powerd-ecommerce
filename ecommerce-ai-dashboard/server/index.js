@@ -17,6 +17,7 @@ const io = new Server(httpServer, {
 });
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
+app.set('trust proxy', true);
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(cors({ origin: process.env.CLIENT_URL || 'http://localhost:3000', credentials: true }));
@@ -54,10 +55,34 @@ app.use('/api/top-products',      require('./routes/topProducts.routes'));
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'OK', timestamp: new Date() }));
 
-// ─── MongoDB ──────────────────────────────────────────────────────────────────
+// ─── MongoDB + Auto-seed demo users ──────────────────────────────────────────
+async function autoSeedDemoUsers() {
+  const DEMO_USERS = [
+    { name: 'Admin User',    email: 'admin@demo.com',    password: 'demo123', role: 'admin'    },
+    { name: 'Vendor User',   email: 'vendor@demo.com',   password: 'demo123', role: 'vendor'   },
+    { name: 'Customer User', email: 'customer@demo.com', password: 'demo123', role: 'customer',
+      customerSegment: 'regular', preferences: ['Electronics','Home & Living','Sports'],
+      location: 'Addis Ababa, Ethiopia' },
+  ];
+  let created = 0;
+  for (const u of DEMO_USERS) {
+    const exists = await User.findOne({ email: u.email });
+    if (!exists) {
+      // NOTE: Do NOT hash here — the User model's pre('save') hook hashes automatically.
+      // Hashing here would double-hash the password and break login.
+      await User.create({ ...u });
+      created++;
+    }
+  }
+  if (created > 0) console.log(`✅ Auto-seeded ${created} demo user(s)`);
+}
+
 mongoose
   .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/ecommerce_ai')
-  .then(() => console.log('✅ MongoDB connected'))
+  .then(async () => {
+    console.log('✅ MongoDB connected');
+    await autoSeedDemoUsers();
+  })
   .catch(err => console.error('❌ MongoDB error:', err));
 
 // ─── Socket events ────────────────────────────────────────────────────────────

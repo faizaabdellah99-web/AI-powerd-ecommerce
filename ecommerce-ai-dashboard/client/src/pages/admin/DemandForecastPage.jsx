@@ -9,57 +9,29 @@ import {
   ResponsiveContainer, CartesianGrid, ReferenceLine, Legend,
 } from 'recharts';
 
-// ── Generate realistic demo sales history ─────────────────────────────────────
-function buildDemoHistory(productName, days) {
-  const name = (productName || '').toLowerCase();
-  const base = name.includes('milk') ? 140
-    : name.includes('coffee') ? 95
-    : name.includes('phone') || name.includes('samsung') ? 12
-    : name.includes('headphone') || name.includes('sony') ? 8
-    : name.includes('laptop') || name.includes('macbook') ? 5
-    : name.includes('shoe') || name.includes('sneaker') ? 18
-    : name.includes('book') ? 22
-    : name.includes('vitamin') || name.includes('protein') ? 35
-    : name.includes('dumbbell') || name.includes('yoga') ? 14
-    : 40;
-
-  const trendDir = Math.random() > 0.45 ? 1 : -0.4;
-  const seasonal = Math.random() > 0.5;
-
-  return Array.from({ length: days }, (_, i) => {
-    const seasonalBoost = seasonal && (i % 7 === 5 || i % 7 === 6) ? base * 0.25 : 0;
-    const qty = Math.max(1, Math.round(
-      base
-      + trendDir * (i / days) * base * 0.3
-      + seasonalBoost
-      + (Math.random() - 0.5) * base * 0.3
-    ));
-    return {
-      date:     new Date(Date.now() - (days - i) * 86400000).toISOString().slice(0, 10),
-      quantity: qty,
-    };
-  });
-}
-
 // ── Calculate local forecast ──────────────────────────────────────────────────
 function calcLocalForecast(history, days) {
-  if (!history.length) return [];
+  // No sales history → all-zero forecast (flat line at 0)
+  if (!history.length) {
+    return Array.from({ length: days }, (_, i) => ({
+      date:        new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
+      forecast:    0,
+      upper_bound: 0,
+      lower_bound: 0,
+    }));
+  }
   const quantities = history.map(h => Number(h.quantity) || 0);
-  const avg        = quantities.reduce((s, v) => s + v, 0) / quantities.length;
   const recent7    = quantities.slice(-7);
   const recentAvg  = recent7.reduce((s, v) => s + v, 0) / recent7.length;
-  const trendF     = recentAvg > avg * 1.05 ? 1.015 : recentAvg < avg * 0.9 ? 0.985 : 1.0;
 
+  // Use simple linear trend without random variance for consistency
   return Array.from({ length: days }, (_, i) => {
-    const pred = Math.max(1, Math.round(
-      recentAvg * Math.pow(trendF, i + 1)
-      + (Math.random() - 0.5) * recentAvg * 0.15
-    ));
+    const pred = Math.max(0, Math.round(recentAvg));
     return {
       date:        new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
       forecast:    pred,
-      upper_bound: Math.round(pred * 1.22),
-      lower_bound: Math.max(1, Math.round(pred * 0.78)),
+      upper_bound: Math.round(pred * 1.15),
+      lower_bound: Math.max(0, Math.round(pred * 0.85)),
     };
   });
 }
@@ -110,19 +82,20 @@ export default function DemandForecastPage() {
     api.get(`/products/${productId}/sales-history?days=${histDays}`)
       .then(({ data }) => {
         const h = (data.history || []).filter(s => s.quantity != null);
-        if (h.length >= 5) {
+        const totalSold = h.reduce((s, x) => s + (Number(x.quantity) || 0), 0);
+        if (totalSold > 0) {
+          // Real sales history exists → use it
           setSalesHistory(h.map(s => ({
             date:     s.date?.slice(0, 10),
             quantity: Number(s.quantity) || 0,
           })));
         } else {
-          const prod = products.find(p => p._id === productId);
-          setSalesHistory(buildDemoHistory(prod?.name, histDays));
+          // Zero sales / no orders history → keep empty so chart shows flat 0 line
+          setSalesHistory([]);
         }
       })
       .catch(() => {
-        const prod = products.find(p => p._id === productId);
-        setSalesHistory(buildDemoHistory(prod?.name, histDays));
+        setSalesHistory([]);
       })
       .finally(() => setHistLoading(false));
   }, [productId, histDays]); // eslint-disable-line
@@ -140,27 +113,81 @@ export default function DemandForecastPage() {
   const safeHistory  = (salesHistory  || []).filter(h => h && Number(h.quantity)  >= 0);
   const safeForecast = (activeForecast || []).filter(f => f && Number(f.forecast) >= 0);
 
-  const activeTrend = aiResult?.trend ?? (() => {
-    if (!safeHistory.length) return 'stable';
-    const qs     = safeHistory.map(h => Number(h.quantity) || 0);
-    const avg    = qs.reduce((s,v)=>s+v,0) / qs.length;
-    const recent = qs.slice(-7);
-    const rAvg   = recent.reduce((s,v)=>s+v,0) / Math.max(recent.length, 1);
-    return rAvg > avg * 1.05 ? 'increasing' : rAvg < avg * 0.9 ? 'decreasing' : 'stable';
-  })();
+  // ── Zero-sales detection ─────────────────────────────────────────────────────
+  const hasSalesHistory = safeHistory.some(h => Number(h.quantity) > 0);
 
-  const activeRec = aiResult?.recommendation ?? (() => {
-    const total = safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0);
-    if (activeTrend === 'increasing')
-      return `Demand is rising. Forecast total: ${total} units over ${forecastDays} days. Reorder ~${Math.round(total * 1.15)} units to stay ahead.`;
-    if (activeTrend === 'decreasing')
-      return `Demand is declining. Forecast total: ${total} units over ${forecastDays} days. Reduce next order by ~15% to avoid overstock.`;
-    return `Demand is stable at ~${avgSales} units/day. Forecast total: ${total} units. Maintain current stock levels.`;
-  })();
+  // ── Derived stats — must come BEFORE activeRec which uses avgSales ────────────
+  const totalSales = safeHistory.reduce((s, h) => s + (Number(h.quantity) || 0), 0);
+  const avgSales = histDays > 0 ? Math.round(totalSales / histDays) : 0;
+
+  const maxSales = safeHistory.length
+    ? Math.max(0, ...safeHistory.map(h => Number(h.quantity) || 0))
+    : 0;
+
+  const forecastTotal = safeForecast.length
+    ? safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0)
+    : 0;
+
+  const peakForecast = safeForecast.length
+    ? Math.max(0, ...safeForecast.map(f => Number(f.forecast) || 0))
+    : 0;
+
+  // Average per-row confidence — 0% when no sales history
+  const confidenceRate = hasSalesHistory && safeForecast.length
+    ? Math.min(99, Math.max(1, Math.round(
+        safeForecast.reduce((s, f) => {
+          const pred  = Number(f.forecast)     || 0;
+          const upper = Number(f.upper_bound)  || 0;
+          const lower = Number(f.lower_bound)  || 0;
+          const range = Math.max(0, upper - lower);
+          if (pred === 0) return s;
+          const confidence = 100 - (range / pred) * 40;
+          return s + Math.min(99, Math.max(1, confidence));
+        }, 0) / Math.max(safeForecast.length, 1)
+      )))
+    : 0;
+
+  const activeTrend = !hasSalesHistory
+    ? 'No Sales History'
+    : (aiResult?.trend ?? (() => {
+        if (!safeHistory.length) return 'stable';
+        const qs     = safeHistory.map(h => Number(h.quantity) || 0);
+        const avg    = qs.reduce((s,v)=>s+v,0) / qs.length;
+        const recent = qs.slice(-7);
+        const rAvg   = recent.reduce((s,v)=>s+v,0) / Math.max(recent.length, 1);
+        return rAvg > avg * 1.05 ? 'increasing' : rAvg < avg * 0.9 ? 'decreasing' : 'stable';
+      })());
+
+  const NO_SALES_RECOMMENDATION = 'ለዚህ ምርት ምንም አይነት የሽያጭ ታሪክ አልተገኘም። እቃ ተጨማሪ ከመታዘዙ በፊት የመነሻ ክምችት (Baseline Stock) ብቻ በመያዝ የደንበኞችን የመጀመሪያ ፍላጎት ይከታተሉ።';
+
+  const NO_SALES_TREND_LABEL = 'የሽያጭ ታሪክ የለውም';
+
+  const selectedProduct = products.find(p => p._id === productId);
+
+  const activeRec = !hasSalesHistory
+    ? NO_SALES_RECOMMENDATION
+    : (aiResult?.recommendation ?? (() => {
+        const total = safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0);
+        const currentStock = selectedProduct?.stock || 0;
+        const netNeed = total - currentStock;
+        const reorderQty = Math.max(0, netNeed);
+
+        // ── Net Need = Predicted Demand - Current Inventory ──
+        if (currentStock >= total) {
+          return `Sufficient Stock — No reorder needed. You have ${currentStock} units in stock covering the predicted ${total} units demand.`;
+        } else {
+          return `Stock Up — Suggested reorder: ${reorderQty} units.`;
+        }
+      })());
 
   // ── Run AI Forecast ──────────────────────────────────────────────────────────
   const runForecast = useCallback(async () => {
     if (!productId) return toast.error('Select a product first');
+    if (!hasSalesHistory) {
+      toast('No sales history — showing baseline forecast', { icon: '📊' });
+      setAiResult(null);
+      return;
+    }
     setAiLoading(true);
     const prodName = products.find(p => p._id === productId)?.name || 'Product';
     try {
@@ -186,34 +213,14 @@ export default function DemandForecastPage() {
     } finally {
       setAiLoading(false);
     }
-  }, [productId, products, salesHistory, forecastDays]);
+  }, [productId, products, salesHistory, forecastDays, hasSalesHistory]);
 
-  // ── Derived stats — safe Number() + || 0 everywhere ─────────────────────────
-
-  const avgSales = safeHistory.length
-    ? Math.round(
-        safeHistory.reduce((s, h) => s + (Number(h.quantity) || 0), 0) / safeHistory.length
-      )
-    : 0;
-
-  const maxSales = safeHistory.length
-    ? Math.max(0, ...safeHistory.map(h => Number(h.quantity) || 0))
-    : 0;
-
-  const forecastTotal = safeForecast.length
-    ? safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0)
-    : 0;
-
-  const peakForecast = safeForecast.length
-    ? Math.max(0, ...safeForecast.map(f => Number(f.forecast) || 0))
-    : 0;
-
-  // Mini stats for recommendation card
+  // ── Mini stats for recommendation card ──────────────────────────────────────
   const next7  = safeForecast.slice(0, 7).reduce((s, f) => s + (Number(f.forecast) || 0), 0);
   const next30 = safeForecast.slice(0, 30).reduce((s, f) => s + (Number(f.forecast) || 0), 0);
 
-  const trendColor = { increasing:'#10b981', decreasing:'#ef4444', stable:'#f59e0b' };
-  const trendIcon  = { increasing:'📈', decreasing:'📉', stable:'➡️' };
+  const trendColor = { increasing:'#10b981', decreasing:'#ef4444', stable:'#f59e0b', 'No Sales History':'#6b7280' };
+  const trendIcon  = { increasing:'📈', decreasing:'📉', stable:'➡️', 'No Sales History':'🚫' };
 
   // ── Combined chart data ───────────────────────────────────────────────────────
   const combinedData = [
@@ -227,7 +234,6 @@ export default function DemandForecastPage() {
   ];
   const splitDate = activeForecast[0]?.date;
 
-  const selectedProduct = products.find(p => p._id === productId);
   const isAI = !!aiResult;
 
   return (
@@ -309,12 +315,13 @@ export default function DemandForecastPage() {
       </Card>
 
       {/* ── Summary Stats — update when slider changes ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14, marginBottom:20 }}>
         {[
           ['Trend',          (trendIcon[activeTrend]||'➡️')+' '+(activeTrend||'stable'),   trendColor[activeTrend]||'#f59e0b'],
           ['Avg Sales/day',  `${avgSales} units`,                                            'var(--primary)'                ],
           ['Forecast Total', `${forecastTotal.toLocaleString()} units`,                      '#10b981'                       ],
           ['Peak Forecast',  `${peakForecast} units/day`,                                   '#f59e0b'                       ],
+          ['Confidence Rate', `${confidenceRate}%`,                                          '#8b5cf6'                       ],
         ].map(([l,v,c])=>(
           <div key={l} style={{ background:'var(--card)', border:`1px solid ${c}33`, borderRadius:12, padding:'14px 18px', transition:'all 0.2s' }}>
             <div style={{ fontSize:11, color:'var(--text3)', marginBottom:4 }}>{l}</div>
@@ -334,6 +341,7 @@ export default function DemandForecastPage() {
             <div style={{ fontSize:12, color:'var(--text3)', marginTop:3 }}>
               {histLoading ? '⏳ Loading…' : `${salesHistory.length} days actual · ${activeForecast.length} days forecast`}
               {isAI && <span style={{ marginLeft:8, color:'#10b981', fontWeight:600 }}>✦ Powered by AI</span>}
+              {!hasSalesHistory && !histLoading && <span style={{ marginLeft:8, color:'#6b7280', fontWeight:600 }}>· No Sales History</span>}
             </div>
           </div>
           {/* Live update indicator */}
@@ -398,7 +406,9 @@ export default function DemandForecastPage() {
           <div style={{ fontSize:13, color:'var(--text2)', marginBottom:10 }}>Detected Trend</div>
           <div style={{ fontSize:48, marginBottom:8 }}>{trendIcon[activeTrend]||'➡️'}</div>
           <div style={{ fontSize:20, fontWeight:800, color:trendColor[activeTrend]||'#f59e0b', textTransform:'capitalize' }}>{activeTrend}</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:6 }}>Based on {histDays}-day history</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:6 }}>
+            {hasSalesHistory ? `Based on ${histDays}-day history` : NO_SALES_TREND_LABEL}
+          </div>
         </Card>
 
         <Card>
@@ -412,7 +422,7 @@ export default function DemandForecastPage() {
             {[
               ['Next 7 days',  `${next7} units`,                             '#6366f1'],
               ['Next 30 days', `${next30} units`,                            '#10b981'],
-              ['Peak day',     `${peakForecast} units`,                      '#f59e0b'],
+              ['Peak day',     `${peakForecast} units/day`,                   '#f59e0b'],
             ].map(([l,v,c])=>(
               <div key={l} style={{ background:'var(--bg3)', borderRadius:9, padding:'10px 12px', textAlign:'center' }}>
                 <div style={{ fontSize:10, color:'var(--text3)', marginBottom:4 }}>{l}</div>
@@ -449,7 +459,7 @@ export default function DemandForecastPage() {
                   const range = Math.max(0, upper - lower);
                   const conf  = pred > 0
                     ? Math.min(99, Math.max(1, Math.round(100 - (range / pred) * 40)))
-                    : 50;
+                    : 0;
                   return (
                     <tr key={i} style={{ borderBottom:'1px solid var(--border)', transition:'background 0.1s' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--bg3)'}

@@ -48,7 +48,14 @@ export default function LoginPage() {
       toast.success(`Welcome back, ${user.name}!`);
       navigate(user.role === 'customer' ? '/customer' : '/admin');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed. Check credentials.');
+      console.error('Login error:', err);
+      if (!err.response) {
+        toast.error('Cannot connect to server. Make sure the server is running on port 5000.', { duration: 5000 });
+      } else if (err.response?.status === 401) {
+        toast.error('Wrong email or password. Try the demo buttons below.', { duration: 4000 });
+      } else {
+        toast.error(err.response?.data?.message || 'Login failed. Check credentials.');
+      }
     } finally { setLoading(false); }
   };
 
@@ -61,8 +68,12 @@ export default function LoginPage() {
   };
 
   const demoFill = (role) => {
-    const emails = { admin:'admin@gmail.com', vendor:'vendor@gmail.com', customer:'mira@gmail.com' };
-    setForm({ email: emails[role], password:'123456' });
+    const creds = {
+      admin:    { email:'admin@demo.com',    password:'demo123' },
+      vendor:   { email:'vendor@demo.com',   password:'demo123' },
+      customer: { email:'customer@demo.com', password:'demo123' },
+    };
+    setForm({ email: creds[role].email, password: creds[role].password });
     toast('Demo credentials filled — click Sign in', { icon:'💡' });
   };
 
@@ -224,7 +235,7 @@ export default function LoginPage() {
         </div>
 
         {/* Demo buttons */}
-        <div style={{ display:'flex', gap:10, marginBottom:28 }}>
+        <div style={{ display:'flex', gap:10, marginBottom:16 }}>
           {DEMOS.map(d => (
             <button key={d.role} onClick={() => demoFill(d.role)} className="demo-btn" style={{
               flex:1, padding:'10px 4px', borderRadius:10,
@@ -238,6 +249,10 @@ export default function LoginPage() {
               <div style={{ fontSize:10, color:'var(--text3)' }}>{d.email}</div>
             </button>
           ))}
+        </div>
+        {/* Credentials hint */}
+        <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:12, padding:'8px 12px', background:'var(--bg3)', borderRadius:8 }}>
+          💡 All demo accounts use password: <strong style={{ color:'var(--text2)' }}>demo123</strong>
         </div>
 
         {/* Register link */}

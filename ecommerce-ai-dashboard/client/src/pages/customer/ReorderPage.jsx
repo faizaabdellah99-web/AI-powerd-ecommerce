@@ -130,65 +130,50 @@ export default function ReorderPage() {
     let active = true;
     const fetchProducts = async () => {
       try {
-        const { data } = await api.get('/products');
+        const { data } = await api.get('/products?all=true&limit=200');
         if (!active) return;
 
-        // Build a product lookup map by ID and name
-        const productMap = {};
-        const productList = data.products || data || []; // Handle both array and object with products property
-        console.log('Fetched products:', productList.length, 'products');
-        
-        if (productList && productList.length > 0) {
-          productList.forEach(product => {
-            productMap[product._id] = {
-              product_name: product.name,
-              price: product.price || 0,
-              stock: product.stock || 0,
-              category: product.category || 'General',
-              imageUrl: product.imageUrl || product.images?.[0] || null,
-            };
-            // Also map by name for fallback matching
-            productMap[product.name] = productMap[product._id];
-          });
-          console.log('Product map built with', Object.keys(productMap).length, 'entries');
+        const productList = Array.isArray(data) ? data : (data.products || []);
 
-          // Build trending products — sort by sales history quantity (most sold first),
-          // then by rating, then by stock as fallback so products always show up
-          const trending = [...productList]
-            .map(p => {
-              const totalSold = (p.salesHistory || []).reduce((sum, s) => sum + (s.quantity || 0), 0);
-              // Try multiple image sources
-              const imageUrl = p.images?.[0]?.url || p.images?.[0] || p.imageUrl || null;
-              console.log('Product image for', p.name, ':', imageUrl);
-              return {
-                _id: p._id,
-                name: p.name,
-                price: p.price || 0,
-                stock: p.stock || 0,
-                category: p.category || 'General',
-                imageUrl,
-                totalSold,
-                rating: p.ratings?.average || 0,
-                ratingCount: p.ratings?.count || 0,
-              };
-            })
-            .sort((a, b) => {
-              // Primary: most sold
-              if (b.totalSold !== a.totalSold) return b.totalSold - a.totalSold;
-              // Secondary: highest rating
-              if (b.rating !== a.rating) return b.rating - a.rating;
-              // Tertiary: most stock available
-              return b.stock - a.stock;
-            })
-            .slice(0, 6);
-          console.log('Trending products:', trending.length, 'items');
-          setTrendingProducts(trending);
-        }
+        // Build lookup map
+        const productMap = {};
+        productList.forEach(product => {
+          const entry = {
+            product_name: product.name,
+            price:    product.price  || 0,
+            stock:    product.stock  || 0,
+            category: product.category || 'General',
+            imageUrl: product.images?.[0]?.url || product.images?.[0] || product.imageUrl || null,
+          };
+          productMap[product._id]  = entry;
+          productMap[product.name] = entry;
+        });
+        setProducts(productMap);
+
+        // Build trending — always, regardless of length
+        const trending = [...productList]
+          .map(p => ({
+            _id:       p._id,
+            name:      p.name,
+            price:     p.price    || 0,
+            stock:     p.stock    || 0,
+            category:  p.category || 'General',
+            imageUrl:  p.images?.[0]?.url || p.images?.[0] || p.imageUrl || null,
+            totalSold: (p.salesHistory || []).reduce((s, h) => s + (Number(h.quantity) || 0), 0),
+            rating:    p.ratings?.average || 0,
+          }))
+          .sort((a, b) =>
+            b.totalSold !== a.totalSold ? b.totalSold - a.totalSold :
+            b.rating    !== a.rating    ? b.rating    - a.rating    :
+            b.stock     - a.stock
+          )
+          .slice(0, 6);
+
+        setTrendingProducts(trending);
       } catch (err) {
         console.error('Failed to fetch products:', err);
       } finally {
-        if (active) setProductsLoading(false);
-        if (active) setTrendingLoading(false);
+        if (active) { setProductsLoading(false); setTrendingLoading(false); }
       }
     };
     fetchProducts();
@@ -493,7 +478,7 @@ export default function ReorderPage() {
         </div>
         {!ordersLoading && orderHistory.length === 0 ? (
           <div style={{
-            textAlign: 'center', padding: '40px 20px',
+            textAlign: 'center', padding: '32px 20px',
             background: 'var(--bg3)', borderRadius: 12,
             border: '1px dashed var(--border)',
           }}>
@@ -506,7 +491,7 @@ export default function ReorderPage() {
             </div>
             <div style={{ marginTop: 20 }}>
               <Button onClick={() => navigate('/customer/shop')} style={{ background: 'var(--primary)' }}>
-                🛍️ Explore Top Products
+                🛍️ Start Shopping
               </Button>
             </div>
           </div>
@@ -522,91 +507,75 @@ export default function ReorderPage() {
         )}
       </Card>
 
-      {/* ── View Trending Items — shown for all customers ── */}
-      {!trendingLoading && trendingProducts.length > 0 && (
-        <Card style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <div>
-              <div style={{ fontSize: 15, fontWeight: 600 }}>🔥 View Trending Items</div>
-              <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
-                Popular products other customers are buying right now
-              </div>
+      {/* ── View Trending Items — always visible for every customer ── */}
+      <Card style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 600 }}>🔥 Trending Items</div>
+            <div style={{ fontSize: 13, color: 'var(--text2)', marginTop: 2 }}>
+              Popular products other customers are buying right now
             </div>
-            <Button onClick={() => navigate('/customer/shop')} style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)' }}>
-              View All →
-            </Button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+          <Button onClick={() => navigate('/customer/shop')} style={{ background: 'transparent', border: '1px solid var(--primary)', color: 'var(--primary)' }}>
+            View All →
+          </Button>
+        </div>
+
+        {trendingLoading ? (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '32px 0' }}>
+            <Spinner />
+          </div>
+        ) : trendingProducts.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text3)', fontSize: 13 }}>
+            No products available yet.{' '}
+            <button onClick={() => navigate('/customer/shop')} style={{ background:'none', border:'none', color:'var(--primary)', cursor:'pointer', fontWeight:600 }}>
+              Browse shop →
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 12 }}>
             {trendingProducts.map((p, i) => (
               <div key={p._id} style={{
                 background: 'var(--bg3)', borderRadius: 10, overflow: 'hidden',
-                border: '1px solid var(--border)', cursor: 'pointer',
-                transition: 'all 0.15s',
+                border: '1px solid var(--border)', cursor: 'pointer', transition: 'all 0.15s',
               }}
                 onClick={() => navigate('/customer/shop')}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(99,102,241,0.15)'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
-                {/* Product image */}
-                <div style={{ height: 100, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                <div style={{ height: 100, background: 'var(--bg2)', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
                   {p.imageUrl ? (
-                    <img 
-                      src={p.imageUrl} 
-                      alt={p.name} 
-                      style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
-                      onError={(e) => {
-                        console.log('Image load error for', p.name, ':', p.imageUrl);
-                        e.target.style.display = 'none';
-                      }}
-                      onLoad={() => console.log('Image loaded for', p.name)}
+                    <img src={p.imageUrl} alt={p.name}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={e => { e.target.style.display = 'none'; }}
                     />
                   ) : (
                     <ProductImage name={p.name} category={p.category} size={64} borderRadius={8} />
                   )}
-                  {/* Rank badge */}
                   <div style={{
                     position: 'absolute', top: 8, left: 8,
                     background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : i === 2 ? '#b45309' : 'var(--primary)',
-                    color: '#fff', fontSize: 10, fontWeight: 700,
-                    padding: '2px 8px', borderRadius: 12,
-                  }}>
-                    #{i + 1}
-                  </div>
-                  {/* Sold badge */}
+                    color: '#fff', fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 12,
+                  }}>#{i + 1}</div>
                   {p.totalSold > 0 && (
-                    <div style={{
-                      position: 'absolute', bottom: 8, right: 8,
-                      background: '#10b981', color: '#fff', fontSize: 9, fontWeight: 600,
-                      padding: '2px 8px', borderRadius: 12,
-                    }}>
+                    <div style={{ position: 'absolute', bottom: 8, right: 8, background: '#10b981', color: '#fff', fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 12 }}>
                       {p.totalSold} sold
                     </div>
                   )}
                 </div>
-                {/* Product info */}
                 <div style={{ padding: 10 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {p.name}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>
-                    {p.category}
-                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--text3)', marginTop: 2 }}>{p.category}</div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary)' }}>
-                      ${(p.price ?? 0).toFixed(2)}
-                    </span>
-                    {p.rating > 0 && (
-                      <span style={{ fontSize: 11, color: '#f59e0b' }}>
-                        ⭐ {p.rating.toFixed(1)}
-                      </span>
-                    )}
+                    <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--primary)' }}>${(p.price ?? 0).toFixed(2)}</span>
+                    {p.rating > 0 && <span style={{ fontSize: 11, color: '#f59e0b' }}>⭐ {p.rating.toFixed(1)}</span>}
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        </Card>
-      )}
+        )}
+      </Card>
 
       {loading && <Spinner />}
 
