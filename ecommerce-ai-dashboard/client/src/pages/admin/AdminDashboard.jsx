@@ -64,8 +64,6 @@ export default function AdminDashboard() {
       setLiveStats(prev => ({
         ...prev,
         pendingOrders: prev.pendingOrders + 1,
-        // Count each order document once — matches Total Orders stat
-        totalOrders:   prev.totalOrders + 1,
       }));
       setLiveOrders(prev => [data, ...prev.slice(0, 4)]);
       toast(`🛒 New order ${data.orderId} — $${Number(data.total).toFixed(2)} by ${data.customerName}`, { duration:5000 });
@@ -136,7 +134,7 @@ export default function AdminDashboard() {
         setLiveStats({
           pendingOrders: dash.pendingOrders != null ? dash.pendingOrders : (stats.pendingOrders || 0),
           todayRevenue:  typeof stats.todayRevenue === 'number' ? stats.todayRevenue : (dash.todayRevenue || 0),
-          totalOrders:   typeof stats.totalOrders === 'number' ? stats.totalOrders : (dash.totalOrders || 0),
+          totalOrders:   dash.totalOrders != null ? dash.totalOrders : (stats.totalOrders || 0),
         });
 
         // 3. Sales by Category
@@ -238,8 +236,8 @@ Give a 2-sentence summary with numbers. Be specific.`,
 
   // ── Use stats from /orders/stats endpoint for total/pending (matches orders page) ─
   const statRevenue = totalRevenue || (chartData || []).reduce((s, m) => s + (m.revenue || 0), 0);
-  // Use liveStats from /orders/stats which matches orders page counts
-  const statOrders = liveStats.totalOrders;
+  // Use totalOrders from dashboard API (142) - this is the source of truth
+  const statOrders = totalOrders;
   const statPending = liveStats.pendingOrders;
 
   return (

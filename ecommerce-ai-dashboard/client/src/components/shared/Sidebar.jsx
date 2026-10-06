@@ -11,7 +11,14 @@ const adminNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/demand',       icon: '📈', label: 'Demand Forecast' },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
+  {
+    path: '/admin/product-ai', icon: '🤖', label: 'Product AI',
+    subItems: [
+      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
+      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
+      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
+    ],
+  },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/segments',     icon: '📊', label: 'Segments'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
@@ -24,7 +31,14 @@ const vendorNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/expiry',       icon: '⏰', label: 'Expiry Tracker'  },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
+  {
+    path: '/admin/product-ai', icon: '🤖', label: 'Product AI',
+    subItems: [
+      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
+      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
+      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
+    ],
+  },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
   { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },
@@ -57,9 +71,17 @@ export default function Sidebar() {
   const { newOrderCount, recentOrders, topCustomers, setTopCustomers } = useOrderStore();
   const [showOrderPanel, setShowOrderPanel] = useState(false);
   const [showCustomerPanel, setShowCustomerPanel] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState({});
   const [orderStats, setOrderStats] = useState({ pending: 0, today: 0, total: 0, totalRevenue: 0 });
   const [feedbackUnread, setFeedbackUnread] = useState(0); // admin: new feedback count
   const [replyUnread, setReplyUnread] = useState(0);       // customer: unread admin replies
+
+  // Auto-expand Product AI menu when on that page
+  useEffect(() => {
+    if (location.pathname === '/admin/product-ai') {
+      setExpandedMenus(p => ({ ...p, '/admin/product-ai': true }));
+    }
+  }, [location.pathname]);
 
   // Reset badge when visiting Orders page
   useEffect(() => {
@@ -206,42 +228,93 @@ export default function Sidebar() {
 
       {/* Nav */}
       <nav style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
-        {nav.map(item => (
-          <NavLink key={item.path} to={item.path} end={item.path.split('/').length === 2}
-            style={({ isActive: active }) => ({
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-              borderRadius: 8, marginBottom: 2, fontSize: 14, fontWeight: 500,
-              color: active ? '#fff' : 'var(--text2)',
-              background: active ? 'var(--primary)' : 'transparent',
-              transition: 'all 0.15s',
-              textDecoration: 'none',
-            })}
-          >
-            <span style={{ fontSize: 16 }}>{item.icon}</span>
-            <span style={{ flex: 1 }}>{item.label}</span>
-            {/* Orders badge */}
-            {(item.label === 'Orders' && user?.role !== 'customer' && newOrderCount > 0) && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                background: '#10b981', color: '#fff', letterSpacing: 0.5,
-              }}>{newOrderCount}</span>
-            )}
-            {/* Admin Feedback badge — unread count */}
-            {(item.label === 'Feedback' && (user?.role === 'admin' || user?.role === 'vendor') && feedbackUnread > 0) && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                background: '#ef4444', color: '#fff', letterSpacing: 0.5,
-              }}>{feedbackUnread > 99 ? '99+' : feedbackUnread}</span>
-            )}
-            {/* Customer Feedback badge — unread replies count */}
-            {(item.label === 'Feedback' && user?.role === 'customer' && replyUnread > 0) && (
-              <span style={{
-                fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20,
-                background: '#f59e0b', color: '#fff', letterSpacing: 0.5,
-              }}>{replyUnread > 99 ? '99+' : replyUnread}</span>
-            )}
-          </NavLink>
-        ))}
+        {nav.map(item => {
+          const hasSubItems = item.subItems && item.subItems.length > 0;
+          const isExpanded  = expandedMenus[item.path];
+          // Active: exact path match OR on a sub-page (with ?tab=)
+          const isParentActive = location.pathname === item.path;
+          const isSubPageActive = hasSubItems && location.pathname === item.path;
+
+          // isActive helper for sub-items with ?tab= query
+          const isSubActive = (subPath) => {
+            if (subPath.includes('?')) {
+              const [base, qs] = subPath.split('?');
+              const param = new URLSearchParams(qs);
+              const cur   = new URLSearchParams(location.search);
+              return location.pathname === base && cur.get('tab') === param.get('tab');
+            }
+            return location.pathname === subPath;
+          };
+
+          return (
+            <div key={item.path} style={{ marginBottom: 2 }}>
+              {/* Parent row */}
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <NavLink
+                  to={hasSubItems ? item.path : item.path}
+                  end={item.path.split('/').length === 2}
+                  onClick={hasSubItems ? (e) => { e.preventDefault(); setExpandedMenus(p => ({ ...p, [item.path]: !p[item.path] })); } : undefined}
+                  style={({ isActive: active }) => ({
+                    display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+                    borderRadius: 8, fontSize: 14, fontWeight: 500, flex: 1,
+                    color: (active || isSubPageActive) ? '#fff' : 'var(--text2)',
+                    background: (active || isSubPageActive) ? 'var(--primary)' : 'transparent',
+                    transition: 'all 0.15s', textDecoration: 'none',
+                  })}
+                >
+                  <span style={{ fontSize: 16 }}>{item.icon}</span>
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {/* Orders badge */}
+                  {item.label === 'Orders' && user?.role !== 'customer' && newOrderCount > 0 && (
+                    <span style={{ fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:20, background:'#10b981', color:'#fff' }}>
+                      {newOrderCount}
+                    </span>
+                  )}
+                  {/* Admin Feedback badge */}
+                  {item.label === 'Feedback' && (user?.role === 'admin' || user?.role === 'vendor') && feedbackUnread > 0 && (
+                    <span style={{ fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:20, background:'#ef4444', color:'#fff' }}>
+                      {feedbackUnread > 99 ? '99+' : feedbackUnread}
+                    </span>
+                  )}
+                  {/* Customer Feedback badge */}
+                  {item.label === 'Feedback' && user?.role === 'customer' && replyUnread > 0 && (
+                    <span style={{ fontSize:9, fontWeight:700, padding:'2px 6px', borderRadius:20, background:'#f59e0b', color:'#fff' }}>
+                      {replyUnread > 99 ? '99+' : replyUnread}
+                    </span>
+                  )}
+                  {/* Expand/collapse chevron */}
+                  {hasSubItems && (
+                    <span style={{ fontSize:10, color:'var(--text3)', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition:'transform 0.2s', display:'inline-block' }}>▼</span>
+                  )}
+                </NavLink>
+              </div>
+
+              {/* Sub-items */}
+              {hasSubItems && isExpanded && (
+                <div style={{ marginLeft:10, marginTop:2, marginBottom:4, paddingLeft:8, borderLeft:'1px solid var(--border)' }}>
+                  {item.subItems.map(sub => (
+                    <NavLink
+                      key={sub.path}
+                      to={sub.path}
+                      style={{
+                        display:'flex', alignItems:'center', gap:8, padding:'7px 12px',
+                        borderRadius:7, marginBottom:1, fontSize:13, fontWeight:400,
+                        textDecoration:'none', transition:'all 0.15s',
+                        color: isSubActive(sub.path) ? '#fff' : 'var(--text2)',
+                        background: isSubActive(sub.path) ? 'var(--primary)' : 'transparent',
+                      }}
+                      onMouseEnter={e => { if (!isSubActive(sub.path)) e.currentTarget.style.background = 'var(--bg3)'; }}
+                      onMouseLeave={e => { if (!isSubActive(sub.path)) e.currentTarget.style.background = 'transparent'; }}
+                    >
+                      <span style={{ fontSize:14 }}>{sub.icon}</span>
+                      <span>{sub.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {/* ── Order Stats Panel (Admin/Vendor only) ── */}
         {user?.role !== 'customer' && (

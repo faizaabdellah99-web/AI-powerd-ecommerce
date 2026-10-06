@@ -14,13 +14,16 @@ const MODELS = [
 function getKey() {
   const key = (process.env.GEMINI_API_KEY || '').trim();
   if (!key || key === 'your_gemini_api_key_here') {
-    throw new Error('GEMINI_API_KEY is not set in server/.env');
+    return null; // Return null instead of throwing error
   }
   return key;
 }
 
 async function callGemini(prompt) {
   const key = getKey();
+  if (!key) {
+    throw new Error('GEMINI_API_KEY not configured');
+  }
   const body = { contents: [{ parts: [{ text: prompt }] }] };
 
   let lastErr;
@@ -67,12 +70,13 @@ exports.getAIForecast = async (req, res) => {
     const twelveMonthsAgo = new Date(); twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
     // ── Fetch real data ────────────────────────────────────────────────────
-    const [orders, topProductsByStock] = await Promise.all([
+    const [orders, topProductsByStock, totalOrdersCount] = await Promise.all([
       Order.find({
         paymentStatus: 'paid',
         createdAt: { $gte: twelveMonthsAgo },
       }).populate('customer', 'name email location'),
       Product.find({ isActive: true }).sort({ stock: -1 }).limit(10).select('name category price stock salesHistory'),
+      Order.countDocuments(), // Get total order count for accurate display
     ]);
 
     // ── Monthly revenue aggregation (Jan of current year → current month) ──
@@ -149,7 +153,7 @@ exports.getAIForecast = async (req, res) => {
     const lowStockProducts = topProductsByStock.filter(p => p.stock <= (p.reorderPoint || 10));
     const highStockProducts = topProductsByStock.filter(p => p.stock > 100);
 
-    // ── Linear regression forecast (server-side calculation) ──────────────
+    // ── Simple forecast using recent average (consistent with Demand Forecast) ──
     // Use the MOST RECENT 6 months (slice(-6)) — entries are ordered oldest→newest
     const actualData = Object.entries(monthRevenue).slice(-6).filter(([_, v]) => v > 0);
     const revenueValues = actualData.map(([_, v]) => v);
@@ -160,25 +164,13 @@ exports.getAIForecast = async (req, res) => {
     let growthRate = 0;
 
     if (n >= 2) {
-      const points = revenueValues.map((y, x) => ({ x, y }));
-      const sumX = points.reduce((s, p) => s + p.x, 0);
-      const sumY = points.reduce((s, p) => s + p.y, 0);
-      const sumXY = points.reduce((s, p) => s + p.x * p.y, 0);
-      const sumX2 = points.reduce((s, p) => s + p.x * p.x, 0);
-      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-      const intercept = (sumY - slope * sumX) / n;
+      // Use simple average of last 6 months for consistent forecast
+      const recentAvgRevenue = revenueValues.reduce((s, v) => s + v, 0) / n;
+      const orderValues = Object.entries(monthOrders).slice(-6).filter(([_, v]) => v > 0).map(([_, v]) => v);
+      const recentAvgOrders = orderValues.reduce((s, v) => s + v, 0) / orderValues.length;
 
-      const orderPoints = Object.entries(monthOrders).slice(-6).filter(([_, v]) => v > 0).map(([_, y], x) => ({ x, y }));
-      const oSumX = orderPoints.reduce((s, p) => s + p.x, 0);
-      const oSumY = orderPoints.reduce((s, p) => s + p.y, 0);
-      const oSumXY = orderPoints.reduce((s, p) => s + p.x * p.y, 0);
-      const oSumX2 = orderPoints.reduce((s, p) => s + p.x * p.x, 0);
-      const oSlope = (n * oSumXY - oSumX * oSumY) / (n * oSumX2 - oSumX * oSumX);
-      const oIntercept = (oSumY - oSlope * oSumX) / n;
-
-      const nextX = n;
-      forecastRevenue = Math.max(0, Math.round(slope * nextX + intercept));
-      forecastOrders = Math.max(0, Math.round(oSlope * nextX + oIntercept));
+      forecastRevenue = Math.max(0, Math.round(recentAvgRevenue));
+      forecastOrders = Math.max(0, Math.round(recentAvgOrders));
 
       // Growth rate from first to last actual month
       const firstRev = revenueValues[0] || 1;
@@ -188,14 +180,15 @@ exports.getAIForecast = async (req, res) => {
       // Generate 5-month forecast (Aug, Sep, Oct, Nov, Dec)
       const nextMonths = [];
       for (let i = 1; i <= 5; i++) {
-        const x = n - 1 + i;
-        const fRev = Math.max(0, Math.round(slope * x + intercept));
-        const fOrd = Math.max(0, Math.round(oSlope * x + oIntercept));
+        const fRev = Math.max(0, Math.round(recentAvgRevenue));
+        const fOrd = Math.max(0, Math.round(recentAvgOrders));
         const d = new Date(); d.setMonth(d.getMonth() + i);
         nextMonths.push({
           month: monthNames[d.getMonth()],
           revenue: fRev,
           orders: fOrd,
+          lowerRevenue: Math.max(0, Math.round(fRev * 0.5)),  // Lower = 0.5x
+          upperRevenue: Math.round(fRev * 2),  // Upper = 2x
           growth: i === 1 ? Math.round(((fRev - (revenueValues[n - 1] || 0)) / (revenueValues[n - 1] || 1)) * 100) : 0,
         });
       }
@@ -300,7 +293,7 @@ Return ONLY raw JSON (no markdown, no code fences):
         analysis: aiAnalysis,
         summary: {
           totalRevenue: orders.reduce((s, o) => s + (o.total || 0), 0),
-          totalOrders: orders.length,
+          totalOrders: totalOrdersCount, // Use total count from database (142)
           growthRate,
           nextMonthRevenue: forecastRevenue,
           nextMonthOrders: forecastOrders,
@@ -324,7 +317,7 @@ Return ONLY raw JSON (no markdown, no code fences):
         },
         summary: {
           totalRevenue: 0,
-          totalOrders: orders.length,
+          totalOrders: totalOrdersCount, // Use total count from database
           growthRate: 0,
           nextMonthRevenue: 0,
           nextMonthOrders: 0,

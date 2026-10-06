@@ -154,9 +154,16 @@ export default function ProductAIPage() {
   const genDesc = async () => {
     if (!dForm.product_name.trim()) return toast.error('Product name is required');
     setDLoading(true); setDResult(null); setDError('');
+    // Safety: force loading off after 65s to prevent stuck spinner
+    const loadingTimer = setTimeout(() => setDLoading(false), 65000);
     try {
       const result = await generateDescriptionAPI(dForm);
+      console.log('✅ Description result:', result);
+      if (!result || typeof result !== 'object') {
+        throw new Error('Invalid response from server');
+      }
       setDResult(result);
+      clearTimeout(loadingTimer);
       if (result._fallback) toast('⚡ Quota exceeded — showing smart template.', { icon:'⚡', duration:4000 });
       else toast.success('Description generated!');
     } catch (err) {
@@ -210,7 +217,7 @@ export default function ProductAIPage() {
         _fallback: true,
       });
       toast('⚡ Using smart template (AI unavailable).', { icon:'⚡', duration:4000 });
-    } finally { setDLoading(false); }
+    } finally { clearTimeout(loadingTimer); setDLoading(false); }
   };
 
   // ── Smart Fill ────────────────────────────────────────────────────────────

@@ -269,37 +269,24 @@ router.get('/dashboard', protect, authorize('admin', 'vendor'), async (req, res)
 
     const monthly = Object.values(monthMap);
 
-    // ── AI Forecast Calculation (Linear Regression on last 6 months) ─────
-    // Use the most recent 6 months for the regression forecast
+    // ── AI Forecast Calculation (Simple Average on last 6 months) ─────
+    // Use the most recent 6 months for the forecast
     const recentMonthly = monthly.slice(-6);
-    const actualMonths = recentMonthly.map((m, idx) => ({ x: idx, y: m.revenue }));
-    const actualOrderMonths = recentMonthly.map((m, idx) => ({ x: idx, y: m.orders }));
-    const regressionBase = recentMonthly.length; // 6 months base for forecast extrapolation
+    const recentMonthlyOrders = monthly.slice(-6);
 
-    // Linear regression: y = mx + b
-    function linearRegression(data) {
-      const n = data.length;
-      if (n < 2) return { slope: 0, intercept: data[0]?.y || 0 };
-      const sumX = data.reduce((s, p) => s + p.x, 0);
-      const sumY = data.reduce((s, p) => s + p.y, 0);
-      const sumXY = data.reduce((s, p) => s + p.x * p.y, 0);
-      const sumX2 = data.reduce((s, p) => s + p.x * p.x, 0);
-      const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-      const intercept = (sumY - slope * sumX) / n;
-      return { slope, intercept };
-    }
-
-    const revReg = linearRegression(actualMonths);
-    const ordReg = linearRegression(actualOrderMonths);
+    // Simple average for consistent forecast
+    const avgRevenue = recentMonthly.length > 0
+      ? recentMonthly.reduce((s, m) => s + m.revenue, 0) / recentMonthly.length
+      : 0;
+    const avgOrders = recentMonthlyOrders.length > 0
+      ? recentMonthlyOrders.reduce((s, m) => s + m.orders, 0) / recentMonthlyOrders.length
+      : 0;
 
     // Generate forecast for next 3 months
     const forecastEntries = Object.entries(forecastMonthMap);
     forecastEntries.forEach(([key, val], idx) => {
-      const nextX = regressionBase + idx;
-      const predictedRevenue = Math.max(0, revReg.slope * nextX + revReg.intercept);
-      const predictedOrders = Math.max(0, Math.round(ordReg.slope * nextX + ordReg.intercept));
-      forecastMonthMap[key].forecast = Math.round(predictedRevenue);
-      forecastMonthMap[key].forecastOrders = predictedOrders;
+      forecastMonthMap[key].forecast = Math.round(avgRevenue);
+      forecastMonthMap[key].forecastOrders = Math.round(avgOrders);
     });
 
     const forecastData = Object.values(forecastMonthMap);

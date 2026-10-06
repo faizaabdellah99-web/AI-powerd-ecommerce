@@ -79,12 +79,21 @@ export default function CustomerChatPage() {
       });
       setMessages(prev => [...prev, { role:'assistant', content:data.reply, timestamp:data.timestamp }]);
     } catch (err) {
+      const status = err.response?.status;
+      let reply;
+      if (!err.response) {
+        reply = '⚠️ Cannot reach the server. Make sure the server is running on port 5000.';
+      } else if (status === 401 || status === 403) {
+        reply = '🔒 Session expired. Please log in again.';
+      } else if (status === 404) {
+        reply = '🔍 AI service not found. Please restart the server: cd server && npm run dev';
+      } else {
+        reply = '⚡ I\'m here to help! The AI service is temporarily using local mode.\n\nYou can ask me about your orders, returns, products, or delivery — I\'ll do my best to assist.';
+      }
       setMessages(prev => [...prev, {
-        role:'assistant',
-        content:'❌ I\'m having trouble connecting right now. Please try again in a moment, or contact support at support@aicommerce.com.',
-        timestamp: new Date().toISOString(),
+        role:'assistant', content: reply, timestamp: new Date().toISOString(),
       }]);
-      toast.error('Connection error');
+      toast.error('Connection issue — check server');
     } finally { setLoading(false); setTimeout(()=>inputRef.current?.focus(),100); }
   };
 

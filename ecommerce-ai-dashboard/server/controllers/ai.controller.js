@@ -248,12 +248,11 @@ Return ONLY this JSON:
       // Generate forecast using recent average
       const forecast = Array.from({ length: forecast_days }, (_, i) => {
         const predicted = Math.max(0, Math.round(recentAvg));
-        const variance = Math.max(1, Math.round(recentAvg * 0.15));
         return {
           date: new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
           predicted_quantity: predicted,
-          lower_bound: Math.max(0, Math.round(predicted - variance)),
-          upper_bound: Math.round(predicted + variance),
+          lower_bound: Math.max(0, Math.round(predicted * 0.5)),  // Lower = 0.5x
+          upper_bound: Math.round(predicted * 2),  // Upper = 2x
         };
       });
       
@@ -414,14 +413,107 @@ const aiChat = async (req, res) => {
 You help with: product insights, sales analysis, pricing strategies, inventory management, demand forecasting, and customer behavior.
 Be concise, helpful, and data-driven. Current context: ${context}`;
 
-    const reply = await geminiChat(history, message, systemContext);
-    res.json({ reply, timestamp: new Date().toISOString() });
+    try {
+      const reply = await geminiChat(history, message, systemContext);
+      return res.json({ reply, timestamp: new Date().toISOString() });
+    } catch (aiErr) {
+      // ── Gemini unavailable → local smart fallback ──────────────────────────
+      console.log('Gemini chat unavailable, using local fallback:', aiErr.message);
+      const reply = buildLocalChatReply(message);
+      return res.json({ reply, timestamp: new Date().toISOString(), _fallback: true });
+    }
 
   } catch (error) {
     console.error('AI Chat Error:', error.message);
     res.status(500).json({ message: error.message || 'Chat failed' });
   }
 };
+
+// ── Local chat fallback (no Gemini needed) ────────────────────────────────────
+function buildLocalChatReply(message) {
+  const m = message.toLowerCase();
+
+  if (m.includes('restock') || m.includes('reorder') || m.includes('inventory') || m.includes('stock')) {
+    return `📦 **Inventory & Restock Tips:**
+
+• Set reorder points at **2× your average daily sales × lead time**
+• Use the Demand Forecast page to see which products need restocking
+• Monitor products with stock below 20 units — flag them as Low Stock
+• Prioritize fast-moving SKUs: Electronics and Food & Beverage typically need more frequent reorders
+• Consider safety stock = (Max daily sales − Avg daily sales) × lead time
+
+Check your **Inventory** page for current stock levels and expiry alerts.`;
+  }
+
+  if (m.includes('pric') || m.includes('discount') || m.includes('competitor')) {
+    return `💰 **Pricing Strategy Tips:**
+
+• Use the **Smart Pricing** page to get AI-powered price recommendations
+• Stay within 5–15% of competitor average prices to remain competitive
+• Dynamic pricing rule: high stock → lower price; low stock + high demand → raise price
+• Offer discounts on slow-moving stock (>60 days in inventory)
+• VIP customers get 15% automatic discount — use this to reward loyalty
+• Margin floor: never price below **Cost × 1.15** to protect profitability`;
+  }
+
+  if (m.includes('sale') || m.includes('revenue') || m.includes('profit') || m.includes('growth')) {
+    return `📊 **Sales & Revenue Growth Tips:**
+
+• Focus on your **top 20% of products** — they typically drive 80% of revenue
+• Increase average order value with bundle offers or "frequently bought together"
+• Use customer segments to target VIP customers with exclusive deals
+• Track daily sales vs. forecast on the **Demand Forecast** page
+• Reduce cart abandonment by offering free shipping above a threshold (e.g. $50)
+• Re-engage dormant customers using the **AI Re-order** prediction page`;
+  }
+
+  if (m.includes('customer') || m.includes('churn') || m.includes('loyal') || m.includes('segment')) {
+    return `👥 **Customer Retention Tips:**
+
+• Use **Customer Segments** to identify VIP, Regular, Occasional, and New customers
+• VIP customers (high spend, frequent orders) should get priority support and exclusive discounts
+• Customers who haven't ordered in 30+ days need a re-engagement offer
+• The **Re-order AI** page predicts when customers will need to buy again — use it to send timely reminders
+• Anonymous feedback on the **Feedback** page reveals pain points without needing accounts
+• Segment-based promotions outperform blanket discounts by 2–3×`;
+  }
+
+  if (m.includes('forecast') || m.includes('demand') || m.includes('predict')) {
+    return `📈 **Demand Forecasting Tips:**
+
+• Go to the **Demand Forecast** page and select a product to see AI predictions
+• Use the history slider (14–90 days) to see short vs. long-term trends
+• The forecast slider shows predicted demand for the next 7–90 days
+• Increasing trend → stock up by ~15% above the forecast total
+• Decreasing trend → reduce next order by 10–15% to avoid overstock
+• Stable trend → maintain current stock + safety buffer of 1 week's supply`;
+  }
+
+  if (m.includes('hello') || m.includes('hi') || m.includes('help') || m.includes('what can')) {
+    return `👋 Hello! I'm your AI business assistant for **AI Commerce**.
+
+I can help you with:
+• 📊 **Sales & Revenue** — growth strategies, key metrics, performance analysis
+• 📦 **Inventory** — restock planning, reorder points, expiry management
+• 💰 **Pricing** — competitor analysis, dynamic pricing, discount strategy
+• 👥 **Customers** — segmentation, churn reduction, loyalty programs
+• 📈 **Demand Forecasting** — trend analysis, stock planning, predictions
+
+What would you like to explore? Just ask!`;
+  }
+
+  // Generic helpful response
+  return `I can help with that. Here are some relevant insights for your e-commerce business:
+
+**Key areas to focus on:**
+• 📊 Check the **Dashboard** for today's sales overview and recent orders
+• 📦 Visit **Inventory** to review stock levels and low-stock alerts
+• 📈 Use **Demand Forecast** to predict future sales for any product
+• 💰 Try **Smart Pricing** to get AI-recommended prices based on competitors
+• 👥 Review **Customer Segments** to identify your VIP and at-risk customers
+
+For a more specific answer, try asking about: pricing strategy, inventory management, demand forecasting, customer retention, or sales growth.`;
+}
 
 // ── Analyze Product Image (Vision AI) ────────────────────────────────────────
 const analyzeProductImage = async (req, res) => {

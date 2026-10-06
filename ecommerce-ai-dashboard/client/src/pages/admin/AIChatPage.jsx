@@ -54,6 +54,19 @@ function TypingDots() {
 
 function Bubble({ msg }) {
   const isUser = msg.role === 'user';
+
+  // Simple markdown renderer — bold, headers
+  const renderContent = (text) => {
+    if (!text) return null;
+    return text.split('\n').map((line, i) => {
+      // Bold: **text**
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      const rendered = parts.map((part, j) =>
+        j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+      );
+      return <div key={i} style={{ minHeight: line === '' ? '0.6em' : undefined }}>{rendered}</div>;
+    });
+  };
   return (
     <div style={{
       display:'flex', gap:12, marginBottom:20,
@@ -80,11 +93,11 @@ function Bubble({ msg }) {
           background: isUser ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : 'var(--bg3)',
           color: isUser ? '#fff' : 'var(--text)',
           borderRadius: isUser ? '18px 4px 18px 18px' : '4px 18px 18px 18px',
-          fontSize:14, lineHeight:1.7, whiteSpace:'pre-wrap', wordBreak:'break-word',
+          fontSize:14, lineHeight:1.7, wordBreak:'break-word',
           border: isUser ? 'none' : '1px solid var(--border)',
           boxShadow: isUser ? '0 4px 14px rgba(99,102,241,0.25)' : 'none',
         }}>
-          {msg.content}
+          {isUser ? msg.content : renderContent(msg.content)}
         </div>
         <div style={{ fontSize:10, color:'var(--text3)', marginTop:4 }}>
           {new Date(msg.timestamp).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' })}
@@ -136,12 +149,28 @@ export default function AIChatPage() {
         role:'assistant', content:data.reply, timestamp:data.timestamp,
       }]);
     } catch (err) {
+      const status  = err.response?.status;
+      const msg     = err.response?.data?.message || err.message || '';
+      const isNoServer = !err.response || status === 0;
+      const isAuth     = status === 401 || status === 403;
+
+      let errorText;
+      if (isNoServer) {
+        errorText = `⚠️ Cannot reach the server.\n\nMake sure the server is running:\n  cd server\n  npm run dev`;
+      } else if (isAuth) {
+        errorText = `🔒 Session expired. Please log in again.`;
+      } else if (status === 404) {
+        errorText = `🔍 AI chat endpoint not found (404).\n\nThe server may not have started correctly. Restart it:\n  cd server\n  npm run dev`;
+      } else {
+        errorText = `❌ ${msg || 'Something went wrong'}\n\n💡 The AI will use smart local answers when Gemini is unavailable.`;
+      }
+
       setMessages(prev => [...prev, {
-        role:'assistant',
-        content:`❌ Error: ${err.response?.data?.message || err.message}\n\nCheck:\n• Server is running on port 5000\n• AI_API_KEY is set in server/.env`,
+        role: 'assistant',
+        content: errorText,
         timestamp: new Date().toISOString(),
       }]);
-      toast.error('Message failed — check server connection');
+      toast.error(isNoServer ? 'Server offline — start with: cd server && npm run dev' : 'Message failed');
     } finally {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
