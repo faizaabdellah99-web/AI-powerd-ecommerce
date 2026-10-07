@@ -24,6 +24,17 @@ const STATUS_COLOR = { delivered:'#10b981', shipped:'#3b82f6', pending:'#f59e0b'
 
 function Bubble({ msg }) {
   const isUser = msg.role === 'user';
+
+  const renderContent = (text) => {
+    if (!text) return null;
+    return text.split('\n').map((line, i) => {
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      const rendered = parts.map((part, j) =>
+        j % 2 === 1 ? <strong key={j}>{part}</strong> : part
+      );
+      return <div key={i} style={{ minHeight: line === '' ? '0.6em' : undefined }}>{rendered}</div>;
+    });
+  };
   return (
     <div style={{ display:'flex', gap:10, marginBottom:16, flexDirection:isUser?'row-reverse':'row', animation:'fadeUp 0.2s ease' }}>
       <div style={{ width:34, height:34, borderRadius:'50%', flexShrink:0,

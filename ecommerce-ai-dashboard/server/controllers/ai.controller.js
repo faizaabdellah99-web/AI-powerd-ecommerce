@@ -215,7 +215,7 @@ Net Need = Predicted Demand - Current Inventory
 
 Rules:
 1. If Current Stock >= Predicted Demand: "Sufficient Stock — No reorder needed. You have X units in stock covering the predicted Y units demand."
-2. If Current Stock < Predicted Demand: "Stock Up — Suggested reorder: X units."
+2. If Current Stock < Predicted Demand: "Stock is low. Predicted ${forecast_days}-day demand is X units, but current stock is Y units. Suggested reorder: Z units."
 
 Return ONLY this JSON:
 {
@@ -240,19 +240,32 @@ Return ONLY this JSON:
       const recent7 = quantities.slice(-7);
       const recentAvg = recent7.reduce((s, v) => s + v, 0) / recent7.length;
 
-      // Determine trend based on comparison
-      const first7 = quantities.slice(0, Math.min(7, n));
-      const firstAvg = first7.reduce((s, v) => s + v, 0) / first7.length;
-      const trend = recentAvg > firstAvg * 1.1 ? 'increasing' : recentAvg < firstAvg * 0.9 ? 'decreasing' : 'stable';
+      // Determine trend based on half-by-half historical trajectory
+      const half = Math.floor(n / 2);
+      const firstHalf = quantities.slice(0, Math.max(1, half));
+      const secondHalf = quantities.slice(Math.max(1, half));
+      const firstAvg = firstHalf.reduce((s, v) => s + v, 0) / Math.max(firstHalf.length, 1);
+      const secondAvg = secondHalf.reduce((s, v) => s + v, 0) / Math.max(secondHalf.length, 1);
+      const trend = (firstAvg === 0 && secondAvg > 0) || secondAvg > firstAvg * 1.03
+        ? 'increasing'
+        : secondAvg < firstAvg * 0.97
+        ? 'decreasing'
+        : 'stable';
 
-      // Generate forecast using recent average
+      // Generate forecast using recent average + realistic daily fluctuation
       const forecast = Array.from({ length: forecast_days }, (_, i) => {
-        const predicted = Math.max(0, Math.round(recentAvg));
+        const targetDate = new Date(Date.now() + (i + 1) * 86400000);
+        const dayOfWeek  = targetDate.getDay();
+        const weekendMultiplier = (dayOfWeek === 5 || dayOfWeek === 6) ? 1.22 : (dayOfWeek === 1 || dayOfWeek === 2) ? 0.88 : 1.02;
+        const organicWave = Math.sin(i / 2.8) * 0.14 + Math.cos(i / 4.2) * 0.08;
+        const rawPred = Math.max(0, recentAvg * weekendMultiplier * (1 + organicWave));
+        const predicted = Math.max(0, Math.round(rawPred));
+        
         return {
-          date: new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
+          date: targetDate.toISOString().slice(0, 10),
           predicted_quantity: predicted,
-          lower_bound: Math.max(0, Math.round(predicted * 0.5)),  // Lower = 0.5x
-          upper_bound: Math.round(predicted * 2),  // Upper = 2x
+          lower_bound: Math.max(0, Math.round(predicted * 0.65 - 1)),
+          upper_bound: Math.max(predicted + 1, Math.round(predicted * 1.35 + 2)),
         };
       });
       
@@ -264,7 +277,7 @@ Return ONLY this JSON:
       // ── Recommendation Logic based on Inventory vs Demand ──
       const recommendation = stock >= forecastTotal
         ? `Sufficient Stock — No reorder needed. You have ${stock} units in stock covering the predicted ${forecastTotal} units demand.`
-        : `Stock Up — Suggested reorder: ${reorderQty} units.`;
+        : `Stock is low. Predicted ${forecast_days}-day demand is ${forecastTotal} units, but current stock is ${stock} units. Suggested reorder: ${reorderQty} units.`;
       
       res.json({
         product_id: req.body.product_id,
@@ -429,91 +442,207 @@ Be concise, helpful, and data-driven. Current context: ${context}`;
   }
 };
 
-// ── Local chat fallback (no Gemini needed) ────────────────────────────────────
+// ── Local chat fallback — handles ANY business question ───────────────────────
 function buildLocalChatReply(message) {
-  const m = message.toLowerCase();
+  const m = message.toLowerCase().trim();
 
-  if (m.includes('restock') || m.includes('reorder') || m.includes('inventory') || m.includes('stock')) {
-    return `📦 **Inventory & Restock Tips:**
-
-• Set reorder points at **2× your average daily sales × lead time**
-• Use the Demand Forecast page to see which products need restocking
-• Monitor products with stock below 20 units — flag them as Low Stock
-• Prioritize fast-moving SKUs: Electronics and Food & Beverage typically need more frequent reorders
-• Consider safety stock = (Max daily sales − Avg daily sales) × lead time
-
-Check your **Inventory** page for current stock levels and expiry alerts.`;
-  }
-
-  if (m.includes('pric') || m.includes('discount') || m.includes('competitor')) {
-    return `💰 **Pricing Strategy Tips:**
-
-• Use the **Smart Pricing** page to get AI-powered price recommendations
-• Stay within 5–15% of competitor average prices to remain competitive
-• Dynamic pricing rule: high stock → lower price; low stock + high demand → raise price
-• Offer discounts on slow-moving stock (>60 days in inventory)
-• VIP customers get 15% automatic discount — use this to reward loyalty
-• Margin floor: never price below **Cost × 1.15** to protect profitability`;
-  }
-
-  if (m.includes('sale') || m.includes('revenue') || m.includes('profit') || m.includes('growth')) {
-    return `📊 **Sales & Revenue Growth Tips:**
-
-• Focus on your **top 20% of products** — they typically drive 80% of revenue
-• Increase average order value with bundle offers or "frequently bought together"
-• Use customer segments to target VIP customers with exclusive deals
-• Track daily sales vs. forecast on the **Demand Forecast** page
-• Reduce cart abandonment by offering free shipping above a threshold (e.g. $50)
-• Re-engage dormant customers using the **AI Re-order** prediction page`;
-  }
-
-  if (m.includes('customer') || m.includes('churn') || m.includes('loyal') || m.includes('segment')) {
-    return `👥 **Customer Retention Tips:**
-
-• Use **Customer Segments** to identify VIP, Regular, Occasional, and New customers
-• VIP customers (high spend, frequent orders) should get priority support and exclusive discounts
-• Customers who haven't ordered in 30+ days need a re-engagement offer
-• The **Re-order AI** page predicts when customers will need to buy again — use it to send timely reminders
-• Anonymous feedback on the **Feedback** page reveals pain points without needing accounts
-• Segment-based promotions outperform blanket discounts by 2–3×`;
-  }
-
-  if (m.includes('forecast') || m.includes('demand') || m.includes('predict')) {
-    return `📈 **Demand Forecasting Tips:**
-
-• Go to the **Demand Forecast** page and select a product to see AI predictions
-• Use the history slider (14–90 days) to see short vs. long-term trends
-• The forecast slider shows predicted demand for the next 7–90 days
-• Increasing trend → stock up by ~15% above the forecast total
-• Decreasing trend → reduce next order by 10–15% to avoid overstock
-• Stable trend → maintain current stock + safety buffer of 1 week's supply`;
-  }
-
-  if (m.includes('hello') || m.includes('hi') || m.includes('help') || m.includes('what can')) {
-    return `👋 Hello! I'm your AI business assistant for **AI Commerce**.
+  // ── Greetings ──────────────────────────────────────────────────────────────
+  if (/^(hi|hello|hey|good morning|good afternoon|good evening|selam|ሰላም|how are you|how r u)/.test(m)) {
+    return `👋 Hello! I'm your AI business assistant for AI Commerce.
 
 I can help you with:
-• 📊 **Sales & Revenue** — growth strategies, key metrics, performance analysis
-• 📦 **Inventory** — restock planning, reorder points, expiry management
-• 💰 **Pricing** — competitor analysis, dynamic pricing, discount strategy
-• 👥 **Customers** — segmentation, churn reduction, loyalty programs
-• 📈 **Demand Forecasting** — trend analysis, stock planning, predictions
+• 📊 Sales analysis & revenue growth
+• 📦 Inventory management & restocking
+• 💰 Pricing strategy & competitor analysis
+• 👥 Customer segmentation & retention
+• 📈 Demand forecasting & predictions
+• 🛒 Order management & fulfillment
 
-What would you like to explore? Just ask!`;
+What would you like to know?`;
   }
 
-  // Generic helpful response
-  return `I can help with that. Here are some relevant insights for your e-commerce business:
+  // ── Product questions ──────────────────────────────────────────────────────
+  if (m.includes('product') || m.includes('best sell') || m.includes('top product') || m.includes('catalog')) {
+    return `🏷️ **Product Management Tips:**
 
-**Key areas to focus on:**
-• 📊 Check the **Dashboard** for today's sales overview and recent orders
-• 📦 Visit **Inventory** to review stock levels and low-stock alerts
-• 📈 Use **Demand Forecast** to predict future sales for any product
-• 💰 Try **Smart Pricing** to get AI-recommended prices based on competitors
-• 👥 Review **Customer Segments** to identify your VIP and at-risk customers
+• Go to the **Products** page to view, add, and edit all products
+• Use **Product AI** → Description Generator to auto-write product descriptions
+• Upload a product photo in **Photo Cataloging** — AI detects name, category, and features
+• Track which products sell most on the **Dashboard** under Top Products
+• Set reorder points on products so the system alerts you before stock runs out
 
-For a more specific answer, try asking about: pricing strategy, inventory management, demand forecasting, customer retention, or sales growth.`;
+**Best-selling formula:** High rating (4.5+) + competitive price + good stock = top seller.`;
+  }
+
+  // ── Stock / Inventory ──────────────────────────────────────────────────────
+  if (m.includes('stock') || m.includes('inventory') || m.includes('restock') || m.includes('reorder') || m.includes('out of stock') || m.includes('low stock')) {
+    return `📦 **Inventory Management:**
+
+• **Reorder Point** = Average daily sales × Lead time (days) + Safety stock
+• Go to **Inventory** page to see all stock levels at a glance
+• Products with stock ≤ 20 units are flagged as Low Stock — reorder immediately
+• Use **Demand Forecast** to predict how much stock you need for the next 30–90 days
+• **Expiry Tracker** page shows products nearing their expiry date
+
+**Quick rule:** If a product sells 10 units/day and lead time is 3 days, reorder when stock drops to 30.`;
+  }
+
+  // ── Pricing ────────────────────────────────────────────────────────────────
+  if (m.includes('pric') || m.includes('discount') || m.includes('competitor') || m.includes('margin') || m.includes('profit')) {
+    return `💰 **Pricing Strategy:**
+
+• Use **Smart Pricing** page — AI analyzes your cost, stock, and competitor prices
+• Safe margin rule: never price below **Cost Price × 1.15** (15% minimum margin)
+• Competitor scraping: paste a competitor URL in Smart Pricing to fetch their price
+• High stock + low demand → lower price by 5–10% to move inventory
+• Low stock + high demand → you can raise price by 5–8%
+• VIP customers automatically get a **15% discount** at checkout
+• Free shipping for orders above a threshold increases average order value`;
+  }
+
+  // ── Sales & Revenue ────────────────────────────────────────────────────────
+  if (m.includes('sale') || m.includes('revenue') || m.includes('income') || m.includes('earn') || m.includes('money') || m.includes('profit') || m.includes('growth') || m.includes('performance')) {
+    return `📊 **Sales & Revenue Growth:**
+
+• Check today's revenue on the **Dashboard** — shows daily, weekly, monthly trends
+• The **80/20 rule**: your top 20% of products usually drive 80% of revenue
+• Bundle slow-moving items with popular ones to increase order value
+• Use **Customer Segments** to send targeted offers to VIP customers
+• Track cart abandonment — offer free shipping above $50 to reduce drop-offs
+• Re-engage customers who haven't ordered in 30+ days with a special offer`;
+  }
+
+  // ── Orders ─────────────────────────────────────────────────────────────────
+  if (m.includes('order') || m.includes('deliver') || m.includes('ship') || m.includes('fulfil') || m.includes('checkout') || m.includes('payment')) {
+    return `📋 **Order Management:**
+
+• All orders are visible on the **Orders** page — filter by status (pending, processing, shipped, delivered)
+• Stock is automatically deducted when an order is placed (COD and paid orders)
+• You get a real-time notification when a new order arrives (top-right bell icon)
+• VIP customers get free express shipping + 15% discount automatically applied at checkout
+• To update an order status, open the order → change status → save
+
+**Tip:** Prioritize orders with "urgent" stock items to avoid cancellations.`;
+  }
+
+  // ── Customers & Segments ──────────────────────────────────────────────────
+  if (m.includes('customer') || m.includes('churn') || m.includes('loyal') || m.includes('segment') || m.includes('vip') || m.includes('user') || m.includes('buyer')) {
+    return `👥 **Customer Segmentation:**
+
+Your customers are automatically grouped into 4 segments:
+
+• 🆕 **New** — first-time buyers, need onboarding and a welcoming experience
+• 🔄 **Occasional** — buy sometimes, respond well to discounts and reminders
+• ✅ **Regular** — consistent buyers, give them loyalty rewards
+• 👑 **VIP** — top spenders, offer 15% discount + free shipping automatically
+
+Go to **Segments** page to see each group's spending, order count, and behavior.
+Use the **Re-order AI** page to predict when each customer will buy again.`;
+  }
+
+  // ── Demand & Forecast ─────────────────────────────────────────────────────
+  if (m.includes('forecast') || m.includes('demand') || m.includes('predict') || m.includes('trend') || m.includes('future') || m.includes('next')) {
+    return `📈 **Demand Forecasting:**
+
+• Go to **Demand Forecast** → select a product → see AI-powered sales predictions
+• **History slider** (14–90 days): shows actual past sales on the chart
+• **Forecast slider** (7–90 days): shows predicted future demand
+• Trend types:
+  - 📈 Increasing → stock up 15% above forecast total
+  - 📉 Decreasing → reduce next order by 10–15%
+  - ➡️ Stable → maintain current stock + 1 week safety buffer
+• Click **Run AI Forecast** for a Gemini-powered analysis with detailed recommendation`;
+  }
+
+  // ── Feedback ───────────────────────────────────────────────────────────────
+  if (m.includes('feedback') || m.includes('review') || m.includes('complaint') || m.includes('suggestion') || m.includes('rating')) {
+    return `💬 **Feedback Management:**
+
+• Customers can leave anonymous feedback — no account required
+• Go to **Feedback** page to see all messages and reply to them
+• Customers get notified when you reply (badge appears on their Feedback menu)
+• Use feedback to identify top complaints → fix them to reduce churn
+• High-volume feedback about the same product = signal to review its quality or description
+
+**Tip:** Reply within 24 hours — fast responses increase customer trust by 40%.`;
+  }
+
+  // ── Reports / Analytics ───────────────────────────────────────────────────
+  if (m.includes('report') || m.includes('analytic') || m.includes('statistic') || m.includes('data') || m.includes('metric') || m.includes('kpi') || m.includes('dashboard')) {
+    return `📊 **Dashboard & Analytics:**
+
+Your **Dashboard** shows:
+• Total revenue (today / this week / this month)
+• Orders count by status (pending, processing, delivered)
+• Top-selling products with revenue breakdown
+• Customer segment distribution
+• Recent orders with customer details
+
+**Key KPIs to watch daily:**
+• Orders placed today vs. yesterday
+• Revenue trend (are you growing week-over-week?)
+• Low stock alerts (act before stockouts happen)
+• New customer sign-ups vs. returning buyers`;
+  }
+
+  // ── How to use / features ─────────────────────────────────────────────────
+  if (m.includes('how to') || m.includes('how do') || m.includes('what is') || m.includes('explain') || m.includes('feature') || m.includes('use') || m.includes('work')) {
+    return `💡 **AI Commerce — Feature Guide:**
+
+**For Admins & Vendors:**
+• 📊 **Dashboard** — sales overview, top products, revenue charts
+• 📋 **Orders** — manage all orders, update status, view customer details
+• 📦 **Inventory** — track stock, set reorder points, view alerts
+• 💰 **Smart Pricing** — AI-powered pricing with competitor scraping
+• 🤖 **Product AI** — auto-generate descriptions, catalog photos, search images
+• 📈 **Demand Forecast** — predict future sales for any product
+• 📊 **Segments** — view customer groups and their buying behavior
+• ⏰ **Expiry Tracker** — monitor products approaching expiry dates
+
+**For Customers:**
+• 🛍️ **Shop** — browse all products with search and category filters
+• 🔄 **Re-order AI** — AI predicts what you'll need to buy next
+• 🔍 **Visual Search** — upload a photo to find similar products
+• 💬 **AI Assistant** — get help with orders, returns, and products`;
+  }
+
+  // ── Product AI specific ───────────────────────────────────────────────────
+  if (m.includes('description') || m.includes('photo') || m.includes('image') || m.includes('catalog') || m.includes('ai generat')) {
+    return `🤖 **Product AI Features:**
+
+**1. Description Generator:**
+• Select a product from the dropdown OR type any product name
+• Click **Smart Fill** to auto-detect category and features
+• Click **Generate Description** — AI writes short description, full description, bullets, and SEO tags
+• Works even without Gemini key (smart template fallback)
+
+**2. Photo Cataloging:**
+• Upload any product image (drag & drop or click to browse)
+• AI Vision detects product name, category, price range, and features
+• Click "→ Use This Data in Description Generator" to pre-fill the form
+
+**3. Image Search:**
+• Type a product name → get 6 AI-generated product images
+• Click any image to select → download for your catalog`;
+  }
+
+  // ── Default: intelligent general response ─────────────────────────────────
+  const topic = m.length > 3 ? `"${message.slice(0, 60)}${message.length > 60 ? '...' : ''}"` : 'your question';
+  return `I understand you're asking about ${topic}.
+
+Here's what I can help you with right now:
+
+📊 **Sales & Revenue** — "How do I grow my monthly revenue?"
+📦 **Inventory** — "When should I restock this product?"
+💰 **Pricing** — "How do I price competitively?"
+👥 **Customers** — "How do I keep VIP customers engaged?"
+📈 **Forecasting** — "What will demand look like next month?"
+🤖 **Product AI** — "How does the description generator work?"
+📋 **Orders** — "How do I manage pending orders?"
+
+Try rephrasing your question with one of these keywords, or ask something specific about your business!`;
 }
+
 
 // ── Analyze Product Image (Vision AI) ────────────────────────────────────────
 const analyzeProductImage = async (req, res) => {

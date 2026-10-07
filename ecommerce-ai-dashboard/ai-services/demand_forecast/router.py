@@ -82,13 +82,14 @@ async def demand_forecast(req: DemandForecastRequest):
             trend = "stable"
 
         # Recommendation
-        avg_forecast = np.mean([f.predicted_quantity for f in forecast])
+        total_forecast = int(np.mean([f.predicted_quantity for f in forecast]) * req.forecast_days)
+        reorder_qty = max(0, total_forecast)
         recommendation = (
-            f"Stock up — demand is rising. Suggested reorder: {int(avg_forecast * req.forecast_days * 1.2)} units."
+            f"Stock is low. Predicted {req.forecast_days}-day demand is {total_forecast} units. Suggested reorder: {reorder_qty} units."
             if trend == "increasing" else
-            f"Reduce stock orders. Average daily demand: {avg_forecast:.1f} units."
+            f"Reduce stock orders. Average daily demand: {np.mean([f.predicted_quantity for f in forecast]):.1f} units."
             if trend == "decreasing" else
-            f"Maintain current stock levels. Avg daily demand: {avg_forecast:.1f} units."
+            f"Maintain current stock levels. Avg daily demand: {np.mean([f.predicted_quantity for f in forecast]):.1f} units."
         )
 
         return DemandForecastResponse(

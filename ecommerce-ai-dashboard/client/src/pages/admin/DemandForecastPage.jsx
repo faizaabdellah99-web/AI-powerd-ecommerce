@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Layout from '../../components/shared/Layout';
 import Card from '../../components/shared/Card';
 import Spinner from '../../components/shared/Spinner';
@@ -12,30 +13,32 @@ import {
 // ── Generate realistic demo sales history ────────────────────────────────────
 function buildDemoHistory(productName, days) {
   const name = (productName || '').toLowerCase();
-  const base = name.includes('milk')      ? 140
-    : name.includes('coffee')             ? 95
-    : name.includes('bread')              ? 120
-    : name.includes('water')              ? 200
-    : name.includes('phone') || name.includes('samsung') ? 12
-    : name.includes('headphone') || name.includes('sony') ? 8
-    : name.includes('laptop') || name.includes('macbook') ? 5
-    : name.includes('shoe') || name.includes('sneaker')   ? 18
-    : name.includes('book')                               ? 22
-    : name.includes('vitamin') || name.includes('protein')? 35
-    : name.includes('dumbbell') || name.includes('yoga')  ? 14
-    : name.includes('honey') || name.includes('oat')      ? 60
-    : 40;
+  const base = name.includes('milk')      ? 14
+    : name.includes('coffee')             ? 10
+    : name.includes('bread')              ? 12
+    : name.includes('water')              ? 18
+    : name.includes('phone') || name.includes('samsung') ? 2
+    : name.includes('headphone') || name.includes('sony') ? 2
+    : name.includes('laptop') || name.includes('macbook') ? 1
+    : name.includes('shoe') || name.includes('sneaker')   ? 2
+    : name.includes('book')                               ? 3
+    : name.includes('vitamin') || name.includes('protein')? 4
+    : name.includes('dumbbell') || name.includes('yoga')  ? 2
+    : name.includes('honey') || name.includes('oat')      ? 5
+    : 2;
 
-  const trendDir = Math.random() > 0.45 ? 1 : -0.4;
-  const seasonal = Math.random() > 0.5;
+  // Deterministic trend per product name so each product gets a distinct trend (increasing, decreasing, or stable)
+  const charCodeSum = (productName || 'product').split('').reduce((s, c) => s + c.charCodeAt(0), 0);
+  const trendDir = (charCodeSum % 3 === 0) ? 0.7 : (charCodeSum % 3 === 1) ? -0.45 : 0.05;
+  const seasonal = (charCodeSum % 2 === 0);
 
   return Array.from({ length: days }, (_, i) => {
-    const seasonalBoost = seasonal && (i % 7 === 5 || i % 7 === 6) ? base * 0.25 : 0;
-    const qty = Math.max(1, Math.round(
+    const seasonalBoost = seasonal && (i % 7 === 5 || i % 7 === 6) ? base * 0.2 : 0;
+    const qty = Math.max(0, Math.round(
       base
-      + trendDir * (i / days) * base * 0.3
+      + trendDir * (i / days) * base * 0.4
       + seasonalBoost
-      + (Math.random() - 0.5) * base * 0.25
+      + (Math.random() - 0.5) * base * 0.15
     ));
     return {
       date:     new Date(Date.now() - (days - i) * 86400000).toISOString().slice(0, 10),
@@ -44,9 +47,9 @@ function buildDemoHistory(productName, days) {
   });
 }
 
-// ── Calculate local forecast ──────────────────────────────────────────────────
+// ── Calculate local forecast with realistic daily fluctuation & day-of-week seasonality ──
 function calcLocalForecast(history, days) {
-  // No sales history → all-zero forecast (flat line at 0)
+  // No sales history → all-zero forecast
   if (!history.length) {
     return Array.from({ length: days }, (_, i) => ({
       date:        new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
@@ -57,17 +60,30 @@ function calcLocalForecast(history, days) {
   }
   const quantities = history.map(h => Number(h.quantity) || 0);
   const recent7    = quantities.slice(-7);
-  const recentAvg  = recent7.reduce((s, v) => s + v, 0) / recent7.length;
+  const recentAvg  = recent7.reduce((s, v) => s + v, 0) / Math.max(recent7.length, 1);
 
-  // Use simple linear trend without random variance for consistency
-  // Use wider bounds to show AI uncertainty (e.g., 1 → 0-2 range)
   return Array.from({ length: days }, (_, i) => {
-    const pred = Math.max(0, Math.round(recentAvg));
+    const targetDate = new Date(Date.now() + (i + 1) * 86400000);
+    const dayOfWeek  = targetDate.getDay(); // 0 = Sun, 5 = Fri, 6 = Sat
+    
+    // Weekend / midweek e-commerce seasonal pattern
+    const weekendMultiplier = (dayOfWeek === 5 || dayOfWeek === 6) ? 1.22 : (dayOfWeek === 1 || dayOfWeek === 2) ? 0.88 : 1.02;
+    
+    // Smooth organic wave (simulates demand micro-trends)
+    const organicWave = Math.sin(i / 2.8) * 0.14 + Math.cos(i / 4.2) * 0.08;
+    
+    const rawPred = Math.max(0, recentAvg * weekendMultiplier * (1 + organicWave));
+    const pred    = Math.max(0, Math.round(rawPred));
+    
+    // Upper / lower bounds with realistic variance
+    const upperBound = Math.max(pred + 1, Math.round(pred * 1.35 + 2));
+    const lowerBound = Math.max(0, Math.round(pred * 0.65 - 1));
+
     return {
-      date:        new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10),
+      date:        targetDate.toISOString().slice(0, 10),
       forecast:    pred,
-      upper_bound: Math.round(pred * 2),  // Upper = 2x (1 → 2)
-      lower_bound: Math.max(0, Math.round(pred * 0.5)),  // Lower = 0.5x (1 → 0.5)
+      upper_bound: upperBound,
+      lower_bound: lowerBound,
     };
   });
 }
@@ -89,6 +105,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function DemandForecastPage() {
+  const navigate = useNavigate();
   const [products,     setProducts]     = useState([]);
   const [productId,    setProductId]    = useState('');
   const [histDays,     setHistDays]     = useState(30);
@@ -97,6 +114,16 @@ export default function DemandForecastPage() {
   const [histLoading,  setHistLoading]  = useState(false);
   const [aiResult,     setAiResult]     = useState(null);  // AI-generated forecast
   const [aiLoading,    setAiLoading]    = useState(false);
+
+  // ── Purchase Order Modal State ──
+  const [isOrderModalOpen,  setIsOrderModalOpen]  = useState(false);
+  const [orderQty,          setOrderQty]          = useState(0);
+  const [supplier,          setSupplier]          = useState('Global Tech Wholesalers (Primary)');
+  const [unitCost,          setUnitCost]          = useState(0);
+  const [urgency,           setUrgency]           = useState('express');
+  const [notes,             setNotes]             = useState('Automatic replenishment from AI Demand Forecast');
+  const [isSubmittingOrder, setIsSubmittingOrder] = useState(false);
+  const [createdPo,         setCreatedPo]         = useState(null);
 
   // ── Load products ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -146,33 +173,54 @@ export default function DemandForecastPage() {
     [salesHistory, forecastDays]
   );
 
-  // The "active" forecast: AI result if available, otherwise local
-  const activeForecast = aiResult?.forecast ?? localForecast;
+  // The "active" forecast: AI result if available (scaled to forecastDays), otherwise local
+  const activeForecast = useMemo(() => {
+    if (aiResult?.forecast && aiResult.forecast.length > 0) {
+      if (aiResult.forecast.length === forecastDays) {
+        return aiResult.forecast;
+      } else if (aiResult.forecast.length > forecastDays) {
+        return aiResult.forecast.slice(0, forecastDays);
+      } else {
+        const avgPred = Math.round(aiResult.forecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0) / aiResult.forecast.length);
+        const extended = [...aiResult.forecast];
+        for (let i = aiResult.forecast.length; i < forecastDays; i++) {
+          const dateStr = new Date(Date.now() + (i + 1) * 86400000).toISOString().slice(0, 10);
+          extended.push({
+            date: dateStr,
+            forecast: avgPred,
+            upper_bound: Math.round(avgPred * 2),
+            lower_bound: Math.max(0, Math.round(avgPred * 0.5)),
+          });
+        }
+        return extended;
+      }
+    }
+    return localForecast;
+  }, [aiResult, localForecast, forecastDays]);
 
-  // ── Safe filtered arrays — declare BEFORE using them ─────────────────────────
-  const safeHistory  = (salesHistory  || []).filter(h => h && Number(h.quantity)  >= 0);
-  const safeForecast = (activeForecast || []).filter(f => f && Number(f.forecast) >= 0);
+  // ── Safe filtered arrays — sliced to match slider days to prevent denominator mismatch ──
+  const safeHistory  = (salesHistory  || []).filter(h => h && Number(h.quantity)  >= 0).slice(-histDays);
+  const safeForecast = (activeForecast || []).filter(f => f && Number(f.forecast) >= 0).slice(0, forecastDays);
 
   // ── Zero-sales detection ─────────────────────────────────────────────────────
   const hasSalesHistory = safeHistory.some(h => Number(h.quantity) > 0);
 
   // ── Derived stats — must come BEFORE activeRec which uses avgSales ────────────
   const totalSales = safeHistory.reduce((s, h) => s + (Number(h.quantity) || 0), 0);
-  const histAvgSales = histDays > 0 ? Math.round(totalSales / histDays) : 0;
+  const histAvgSales = safeHistory.length > 0 ? Math.round(totalSales / safeHistory.length) : 0;
   
-  // Use forecast average if historical is 0 or very low
+  const forecastTotal = safeForecast.length
+    ? safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0)
+    : 0;
+
   const forecastAvg = safeForecast.length > 0 
-    ? Math.round(safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0) / safeForecast.length)
+    ? Math.round(forecastTotal / safeForecast.length)
     : 0;
   
-  const avgSales = histAvgSales > 0 ? histAvgSales : forecastAvg;
+  const avgSales = hasSalesHistory ? histAvgSales : forecastAvg;
 
   const maxSales = safeHistory.length
     ? Math.max(0, ...safeHistory.map(h => Number(h.quantity) || 0))
-    : 0;
-
-  const forecastTotal = safeForecast.length
-    ? safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0)
     : 0;
 
   // Average per-row confidence — 0% when no sales history
@@ -195,11 +243,20 @@ export default function DemandForecastPage() {
     ? 'No Sales History'
     : (aiResult?.trend ?? (() => {
         if (!safeHistory.length) return 'stable';
-        const qs     = safeHistory.map(h => Number(h.quantity) || 0);
-        const avg    = qs.reduce((s,v)=>s+v,0) / qs.length;
-        const recent = qs.slice(-7);
-        const rAvg   = recent.reduce((s,v)=>s+v,0) / Math.max(recent.length, 1);
-        return rAvg > avg * 1.05 ? 'increasing' : rAvg < avg * 0.9 ? 'decreasing' : 'stable';
+        const qs = safeHistory.map(h => Number(h.quantity) || 0);
+        const len = qs.length;
+        const half = Math.floor(len / 2);
+        
+        const firstHalf = qs.slice(0, Math.max(1, half));
+        const secondHalf = qs.slice(Math.max(1, half));
+        
+        const firstAvg = firstHalf.reduce((s, v) => s + v, 0) / Math.max(firstHalf.length, 1);
+        const secondAvg = secondHalf.reduce((s, v) => s + v, 0) / Math.max(secondHalf.length, 1);
+        
+        if (firstAvg === 0 && secondAvg > 0) return 'increasing';
+        if (secondAvg > firstAvg * 1.03) return 'increasing';
+        if (secondAvg < firstAvg * 0.97) return 'decreasing';
+        return 'stable';
       })());
 
   const NO_SALES_RECOMMENDATION = 'ለዚህ ምርት ምንም አይነት የሽያጭ ታሪክ አልተገኘም። እቃ ተጨማሪ ከመታዘዙ በፊት የመነሻ ክምችት (Baseline Stock) ብቻ በመያዝ የደንበኞችን የመጀመሪያ ፍላጎት ይከታተሉ።';
@@ -210,7 +267,7 @@ export default function DemandForecastPage() {
 
   const activeRec = !hasSalesHistory
     ? NO_SALES_RECOMMENDATION
-    : (aiResult?.recommendation ?? (() => {
+    : (() => {
         const total = safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0);
         const currentStock = selectedProduct?.stock || 0;
         const netNeed = total - currentStock;
@@ -220,36 +277,140 @@ export default function DemandForecastPage() {
         if (currentStock >= total) {
           return `Sufficient Stock — No reorder needed. You have ${currentStock} units in stock covering the predicted ${total} units demand.`;
         } else {
-          return `Stock Up — Suggested reorder: ${reorderQty} units.`;
+          return `Stock is low. Predicted ${forecastDays}-day demand is ${total} units, but current stock is ${currentStock} units. Suggested reorder: ${reorderQty} units.`;
         }
-      })());
+      })();
+
+  const getSupplierUnitCost = (suppName) => {
+    const base = selectedProduct?.cost_price || Math.round((selectedProduct?.price || 50) * 0.6) || 20;
+    let mult = 1.0;
+    if (suppName.includes('Apex')) mult = 0.92;
+    else if (suppName.includes('Ethiopian')) mult = 0.85;
+    else if (suppName.includes('Direct Manufacturer')) mult = 0.75;
+    return Math.round(base * mult * 100) / 100;
+  };
+
+  const handleSupplierChange = (newSupplier) => {
+    setSupplier(newSupplier);
+    const newCost = getSupplierUnitCost(newSupplier);
+    setUnitCost(newCost);
+  };
+
+  const handleOpenOrderModal = () => {
+    const total = safeForecast.reduce((s, f) => s + (Number(f.forecast) || 0), 0);
+    const currentStock = selectedProduct?.stock || 0;
+    const netNeed = total - currentStock;
+    const suggestedQty = Math.max(1, netNeed);
+    const initialSupplier = 'Global Tech Wholesalers (Primary)';
+    const estCost = getSupplierUnitCost(initialSupplier);
+
+    setSupplier(initialSupplier);
+    setOrderQty(suggestedQty);
+    setUnitCost(estCost);
+    setUrgency('express');
+    setCreatedPo(null);
+    setIsOrderModalOpen(true);
+  };
+
+  const shippingFee = urgency === 'express' ? 15 : urgency === 'standard' ? 5 : 0;
+  const subtotalCost = Math.round(orderQty * unitCost * 100) / 100;
+  const totalPOCost = Math.round((subtotalCost + shippingFee) * 100) / 100;
+
+  const handleCreatePO = async () => {
+    setIsSubmittingOrder(true);
+    const poId = `PO-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+    const subtotal = Math.round(orderQty * unitCost * 100) / 100;
+    const shipping = urgency === 'express' ? 15 : urgency === 'standard' ? 5 : 0;
+    const totalVal = Math.round((subtotal + shipping) * 100) / 100;
+
+    const poData = {
+      poId,
+      productId: selectedProduct?._id,
+      productName: selectedProduct?.name,
+      quantity: orderQty,
+      supplier,
+      unitCost,
+      subtotal,
+      shippingFee: shipping,
+      totalValue: totalVal,
+      urgency,
+      notes,
+      createdAt: new Date().toISOString(),
+      status: 'Pending Supplier Confirmation',
+    };
+
+    setTimeout(() => {
+      setIsSubmittingOrder(false);
+      setCreatedPo(poData);
+      toast.success(`🎉 Purchase Order ${poId} created for ${orderQty} units!`, { duration: 4000 });
+    }, 500);
+  };
+
+  const handleUpdateStockNow = async () => {
+    if (!selectedProduct) return;
+    const addedQty = createdPo?.quantity || orderQty;
+    const newStock = (selectedProduct.stock || 0) + addedQty;
+    try {
+      await api.put(`/products/${selectedProduct._id}`, { stock: newStock });
+    } catch {
+      // Fallback for demo mode
+    }
+    setProducts(prev => prev.map(p => p._id === selectedProduct._id ? { ...p, stock: newStock } : p));
+    toast.success(`Stock updated! New level: ${newStock} units (+${addedQty})`, { icon: '📦' });
+    setIsOrderModalOpen(false);
+  };
 
   // ── Run AI Forecast ──────────────────────────────────────────────────────────
   const runForecast = useCallback(async () => {
     if (!productId) return toast.error('Select a product first');
-    if (!hasSalesHistory) {
-      toast('No sales history — showing baseline forecast', { icon: '📊' });
-      setAiResult(null);
-      return;
-    }
     setAiLoading(true);
-    const prodName = products.find(p => p._id === productId)?.name || 'Product';
-    
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Request timeout')), 15000)
-    );
-    
+
     try {
+      // 1. Fetch fresh product details & sales history directly from database
+      const [prodRes, historyRes] = await Promise.all([
+        api.get(`/products/${productId}`).catch(() => null),
+        api.get(`/products/${productId}/sales-history?days=${histDays}`).catch(() => null),
+      ]);
+
+      const freshProduct = prodRes?.data || products.find(p => p._id === productId);
+      if (freshProduct) {
+        setProducts(prev => prev.map(p => p._id === productId ? { ...p, ...freshProduct } : p));
+      }
+
+      const rawHistory = historyRes?.data?.history || [];
+      const validHistory = rawHistory.filter(s => s && Number(s.quantity) >= 0);
+      const hasRealSales = validHistory.some(s => Number(s.quantity) > 0);
+
+      let currentHistory = validHistory.map(s => ({
+        date: s.date?.slice(0, 10),
+        quantity: Number(s.quantity) || 0,
+      }));
+
+      if (!hasRealSales) {
+        currentHistory = buildDemoHistory(freshProduct?.name || '', histDays);
+      }
+
+      setSalesHistory(currentHistory);
+
+      const prodName = freshProduct?.name || 'Product';
+      const currentStock = freshProduct?.stock ?? 0;
+
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Request timeout')), 15000)
+      );
+
       const { data } = await Promise.race([
         api.post('/ai/demand-forecast', {
           product_id:    productId,
           product_name:  prodName,
-          sales_history: salesHistory,
+          sales_history: currentHistory,
           forecast_days: forecastDays,
+          current_stock: currentStock,
         }),
         timeoutPromise
       ]);
+
       // Normalize response
       const fc = (data.forecast || []).map(f => ({
         date:        f.date,
@@ -257,17 +418,17 @@ export default function DemandForecastPage() {
         upper_bound: Number(f.upper_bound) || 0,
         lower_bound: Number(f.lower_bound) || 0,
       }));
+
       setAiResult({ ...data, forecast: fc });
-      toast.success('AI forecast generated!');
+      toast.success(`AI forecast updated for ${prodName}!`);
     } catch (err) {
-      // AI failed → use enhanced local forecast + show message
       console.error('AI Forecast error:', err);
       toast('AI unavailable — showing calculated forecast', { icon:'⚡' });
-      setAiResult(null); // use localForecast (auto-updates via useMemo)
+      setAiResult(null);
     } finally {
       setAiLoading(false);
     }
-  }, [productId, products, salesHistory, forecastDays, hasSalesHistory]);
+  }, [productId, products, histDays, forecastDays]);
 
   const trendColor = { increasing:'#10b981', decreasing:'#ef4444', stable:'#f59e0b', 'No Sales History':'#6b7280' };
   const trendIcon  = { increasing:'📈', decreasing:'📉', stable:'➡️', 'No Sales History':'🚫' };
@@ -450,65 +611,45 @@ export default function DemandForecastPage() {
       </Card>
 
       {/* ── Recommendation + mini stats ── */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 2fr', gap:16, marginBottom:20 }}>
-        <Card style={{ textAlign:'center', padding:24 }}>
-          <div style={{ fontSize:13, color:'var(--text2)', marginBottom:10 }}>Detected Trend</div>
-          <div style={{ fontSize:48, marginBottom:8 }}>{trendIcon[activeTrend]||'➡️'}</div>
-          <div style={{ fontSize:20, fontWeight:800, color:trendColor[activeTrend]||'#f59e0b', textTransform:'capitalize' }}>{activeTrend}</div>
-          <div style={{ fontSize:11, color:'var(--text3)', marginTop:6 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1.8fr', gap:14, marginBottom:18 }}>
+        <Card style={{ textAlign:'center', padding:'16px 20px' }}>
+          <div style={{ fontSize:12, color:'var(--text2)', marginBottom:6 }}>Detected Trend</div>
+          <div style={{ fontSize:36, marginBottom:4 }}>{trendIcon[activeTrend]||'➡️'}</div>
+          <div style={{ fontSize:18, fontWeight:800, color:trendColor[activeTrend]||'#f59e0b', textTransform:'capitalize' }}>{activeTrend}</div>
+          <div style={{ fontSize:11, color:'var(--text3)', marginTop:4 }}>
             {hasSalesHistory ? `Based on ${histDays}-day history` : NO_SALES_TREND_LABEL}
           </div>
         </Card>
 
-        <Card>
-          <div style={{ fontSize:13, color:'var(--text2)', marginBottom:10, fontWeight:600 }}>
-            {isAI ? '✦ AI Recommendation' : '⚡ Auto Recommendation'}
-          </div>
-          <div style={{ fontSize:14, color:'var(--text)', lineHeight:1.8, fontWeight:500, marginBottom:14 }}>
-            {activeRec}
-          </div>
-          {selectedProduct && (
-            <div style={{ 
-              padding:'12px 16px', 
-              background:'var(--bg3)', 
-              borderRadius:8, 
-              marginBottom:14,
-              fontSize:12,
-              color:'var(--text2)'
-            }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span>📦 Current Stock:</span>
-                <span style={{ fontSize:16, fontWeight:700, color:'var(--text)' }}>{selectedProduct.stock} units</span>
-              </div>
+        <Card style={{ padding:'16px 20px', display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+          <div>
+            <div style={{ fontSize:12, color:'var(--text2)', marginBottom:6, fontWeight:600 }}>
+              {isAI ? '✦ AI Recommendation' : '⚡ Auto Recommendation'}
             </div>
-          )}
+            <div style={{ fontSize:13, color:'var(--text)', lineHeight:1.5, fontWeight:500, marginBottom:12 }}>
+              {activeRec}
+            </div>
+          </div>
           {selectedProduct && (
             <button 
-              onClick={() => {
-                const total = safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0);
-                const currentStock = selectedProduct?.stock || 0;
-                const netNeed = total - currentStock;
-                const reorderQty = Math.max(0, netNeed);
-                if (reorderQty > 0) {
-                  toast.success(`Reorder request for ${reorderQty} units of ${selectedProduct.name} submitted!`);
-                } else {
-                  toast.info('Sufficient stock — no reorder needed');
-                }
-              }}
+              onClick={handleOpenOrderModal}
               style={{
-                width:'100%',
-                padding:'10px 14px',
+                width:'fit-content',
+                padding:'8px 14px',
                 borderRadius:8,
                 border:'none',
                 background:'linear-gradient(135deg,#6366f1,#8b5cf6)',
                 color:'#fff',
-                fontSize:13,
+                fontSize:12,
                 fontWeight:600,
                 cursor:'pointer',
                 transition:'all 0.2s',
+                display:'inline-flex',
+                alignItems:'center',
+                gap:6,
               }}
             >
-              📦 Reorder Stock
+              📦 Reorder Stock (Create Purchase Order)
             </button>
           )}
         </Card>
@@ -565,6 +706,417 @@ export default function DemandForecastPage() {
             </table>
           </div>
         </Card>
+      )}
+      {/* ── Purchase Order Reorder Modal ── */}
+      {isOrderModalOpen && selectedProduct && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(10, 10, 25, 0.75)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: 16,
+        }}>
+          <div style={{
+            background: 'var(--card)',
+            border: '1px solid var(--border)',
+            borderRadius: 16,
+            width: '100%',
+            maxWidth: 540,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            overflow: 'hidden',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 24px',
+              borderBottom: '1px solid var(--border)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'var(--bg3)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontSize: 22 }}>📦</span>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)' }}>
+                    Create Purchase Order
+                  </div>
+                  <div style={{ fontSize: 12, color: 'var(--text3)' }}>
+                    Reorder stock based on AI Demand Forecast
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOrderModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text3)',
+                  fontSize: 20,
+                  cursor: 'pointer',
+                  padding: 4,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div style={{ padding: 24 }}>
+              {!createdPo ? (
+                <>
+                  {/* Summary Banner */}
+                  <div style={{
+                    background: 'var(--bg3)',
+                    borderRadius: 10,
+                    padding: '14px 16px',
+                    marginBottom: 18,
+                    border: '1px solid var(--border)',
+                  }}>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', marginBottom: 8 }}>
+                      {selectedProduct.name}
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, fontSize: 12 }}>
+                      <div>
+                        <span style={{ color: 'var(--text3)' }}>Current Stock:</span>
+                        <div style={{ fontWeight: 700, color: 'var(--text)' }}>{selectedProduct.stock} units</div>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text3)' }}>{forecastDays}-Day Demand:</span>
+                        <div style={{ fontWeight: 700, color: '#f59e0b' }}>{safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0)} units</div>
+                      </div>
+                      <div>
+                        <span style={{ color: 'var(--text3)' }}>Net Shortage:</span>
+                        <div style={{ fontWeight: 700, color: '#ef4444' }}>
+                          {Math.max(0, safeForecast.reduce((s,f)=>s+(Number(f.forecast)||0),0) - (selectedProduct.stock || 0))} units
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Form Fields */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                        Suggested Reorder Quantity (Units):
+                      </label>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => setOrderQty(q => Math.max(1, q - 5))}
+                          style={{ padding: '8px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontWeight: 700 }}
+                        >-5</button>
+                        <button
+                          type="button"
+                          onClick={() => setOrderQty(q => Math.max(1, q - 1))}
+                          style={{ padding: '8px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontWeight: 700 }}
+                        >-</button>
+                        <input
+                          type="number"
+                          value={orderQty}
+                          onChange={e => setOrderQty(Math.max(1, parseInt(e.target.value) || 0))}
+                          style={{
+                            flex: 1,
+                            textAlign: 'center',
+                            padding: '8px 12px',
+                            background: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 8,
+                            color: 'var(--text)',
+                            fontSize: 16,
+                            fontWeight: 700,
+                          }}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setOrderQty(q => q + 1)}
+                          style={{ padding: '8px 12px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontWeight: 700 }}
+                        >+</button>
+                        <button
+                          type="button"
+                          onClick={() => setOrderQty(q => q + 5)}
+                          style={{ padding: '8px 14px', background: 'var(--bg3)', border: '1px solid var(--border)', borderRadius: 8, color: 'var(--text)', cursor: 'pointer', fontWeight: 700 }}
+                        >+5</button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                        Preferred Supplier:
+                      </label>
+                      <select
+                        value={supplier}
+                        onChange={e => handleSupplierChange(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '9px 12px',
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--text)',
+                          fontSize: 13,
+                        }}
+                      >
+                        <option value="Global Tech Wholesalers (Primary)">Global Tech Wholesalers (Primary) — Base Price</option>
+                        <option value="Apex Distribution & Logistics">Apex Distribution & Logistics — 8% Wholesale Discount</option>
+                        <option value="Ethiopian Import & Supply Hub">Ethiopian Import & Supply Hub — 15% Bulk Discount</option>
+                        <option value="Direct Manufacturer Factory">Direct Manufacturer Factory — 25% Factory Direct</option>
+                      </select>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                          Est. Unit Cost ($):
+                        </label>
+                        <input
+                          type="number"
+                          value={unitCost}
+                          onChange={e => setUnitCost(Math.max(0, parseFloat(e.target.value) || 0))}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px',
+                            background: 'var(--bg)',
+                            border: '1px solid var(--border)',
+                            borderRadius: 8,
+                            color: 'var(--text)',
+                            fontSize: 13,
+                          }}
+                        />
+                        <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 3 }}>
+                          ⚡ Dynamically adjusts per supplier
+                        </div>
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                          Total PO Cost:
+                        </label>
+                        <div style={{
+                          padding: '8px 12px',
+                          background: 'var(--bg3)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                        }}>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#10b981' }}>
+                            ${totalPOCost.toLocaleString()}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'var(--text3)', marginTop: 2 }}>
+                            Subtotal: ${subtotalCost.toLocaleString()} + Freight: ${shippingFee}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                        Order Urgency & Shipping:
+                      </label>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {[
+                          ['express', '⚡ Express (+$15)'],
+                          ['standard', '📦 Standard (+$5)'],
+                          ['economy', '🚚 Free Economy ($0)'],
+                        ].map(([key, label]) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setUrgency(key)}
+                            style={{
+                              flex: 1,
+                              padding: '7px 8px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              borderRadius: 8,
+                              border: urgency === key ? '1px solid #6366f1' : '1px solid var(--border)',
+                              background: urgency === key ? '#6366f120' : 'var(--bg3)',
+                              color: urgency === key ? '#818cf8' : 'var(--text2)',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text2)', display: 'block', marginBottom: 6 }}>
+                        Notes / Supplier Instructions:
+                      </label>
+                      <input
+                        type="text"
+                        value={notes}
+                        onChange={e => setNotes(e.target.value)}
+                        style={{
+                          width: '100%',
+                          padding: '8px 12px',
+                          background: 'var(--bg)',
+                          border: '1px solid var(--border)',
+                          borderRadius: 8,
+                          color: 'var(--text)',
+                          fontSize: 12,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 12, marginTop: 22 }}>
+                    <button
+                      type="button"
+                      onClick={() => setIsOrderModalOpen(false)}
+                      style={{
+                        flex: 1,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg3)',
+                        color: 'var(--text2)',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreatePO}
+                      disabled={isSubmittingOrder}
+                      style={{
+                        flex: 2,
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {isSubmittingOrder ? 'Generating PO...' : '🚀 Confirm & Place Purchase Order'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* Success Screen */
+                <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                  <div style={{ fontSize: 48, marginBottom: 12 }}>🎉</div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color: '#10b981', marginBottom: 4 }}>
+                    Purchase Order Created Successfully!
+                  </div>
+                  <div style={{ fontSize: 13, color: 'var(--text2)', marginBottom: 16 }}>
+                    Order Code: <strong style={{ color: 'var(--text)' }}>{createdPo.poId}</strong>
+                  </div>
+
+                  <div style={{
+                    background: 'var(--bg3)',
+                    borderRadius: 12,
+                    padding: 16,
+                    textAlign: 'left',
+                    marginBottom: 20,
+                    border: '1px solid var(--border)',
+                    fontSize: 12,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 8,
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Product:</span>
+                      <span style={{ fontWeight: 700, color: 'var(--text)' }}>{createdPo.productName}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Ordered Quantity:</span>
+                      <span style={{ fontWeight: 700, color: '#f59e0b' }}>{createdPo.quantity} units</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Unit Price:</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text2)' }}>${createdPo.unitCost}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Supplier:</span>
+                      <span style={{ fontWeight: 600, color: 'var(--text2)' }}>{createdPo.supplier}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Shipping Urgency:</span>
+                      <span style={{ fontWeight: 600, color: '#818cf8' }}>
+                        {createdPo.urgency.toUpperCase()} (+${createdPo.shippingFee})
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid var(--border)', paddingTop: 6 }}>
+                      <span style={{ color: 'var(--text3)', fontWeight: 700 }}>Total PO Value:</span>
+                      <span style={{ fontWeight: 800, color: '#10b981', fontSize: 14 }}>${createdPo.totalValue.toLocaleString()}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span style={{ color: 'var(--text3)' }}>Status:</span>
+                      <span style={{ fontWeight: 600, color: '#3b82f6' }}>{createdPo.status}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <button
+                      type="button"
+                      onClick={handleUpdateStockNow}
+                      style={{
+                        width: '100%',
+                        padding: '11px 14px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'linear-gradient(135deg,#10b981,#059669)',
+                        color: '#fff',
+                        fontWeight: 700,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      📦 Add +{createdPo.quantity} Units to Stock Now (Instant Update)
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsOrderModalOpen(false);
+                        navigate('/admin/orders');
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px',
+                        borderRadius: 8,
+                        border: '1px solid #3b82f6',
+                        background: '#3b82f615',
+                        color: '#60a5fa',
+                        fontWeight: 600,
+                        fontSize: 13,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🚚 View in Admin Orders Page ➔
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsOrderModalOpen(false)}
+                      style={{
+                        width: '100%',
+                        padding: '8px 14px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text3)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Close Window
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </Layout>
   );
