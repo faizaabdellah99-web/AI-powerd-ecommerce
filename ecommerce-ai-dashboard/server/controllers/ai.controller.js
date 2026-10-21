@@ -1,5 +1,6 @@
 const axios = require('axios');
 const { getProductKnowledge } = require('../utils/productKnowledge');
+const { buildLocalChatReply } = require('../utils/localAI');
 
 // ── Gemini REST helper — supports both AIzaSy... and AQ.... key formats ───────
 // Model list from Google AI Studio rate limits — ordered by most available quota first
@@ -442,208 +443,6 @@ Be concise, helpful, and data-driven. Current context: ${context}`;
   }
 };
 
-// ── Local chat fallback — handles ANY business question ───────────────────────
-function buildLocalChatReply(message) {
-  const m = message.toLowerCase().trim();
-
-  // ── Greetings ──────────────────────────────────────────────────────────────
-  if (/^(hi|hello|hey|good morning|good afternoon|good evening|selam|ሰላም|how are you|how r u)/.test(m)) {
-    return `👋 Hello! I'm your AI business assistant for AI Commerce.
-
-I can help you with:
-• 📊 Sales analysis & revenue growth
-• 📦 Inventory management & restocking
-• 💰 Pricing strategy & competitor analysis
-• 👥 Customer segmentation & retention
-• 📈 Demand forecasting & predictions
-• 🛒 Order management & fulfillment
-
-What would you like to know?`;
-  }
-
-  // ── Product questions ──────────────────────────────────────────────────────
-  if (m.includes('product') || m.includes('best sell') || m.includes('top product') || m.includes('catalog')) {
-    return `🏷️ **Product Management Tips:**
-
-• Go to the **Products** page to view, add, and edit all products
-• Use **Product AI** → Description Generator to auto-write product descriptions
-• Upload a product photo in **Photo Cataloging** — AI detects name, category, and features
-• Track which products sell most on the **Dashboard** under Top Products
-• Set reorder points on products so the system alerts you before stock runs out
-
-**Best-selling formula:** High rating (4.5+) + competitive price + good stock = top seller.`;
-  }
-
-  // ── Stock / Inventory ──────────────────────────────────────────────────────
-  if (m.includes('stock') || m.includes('inventory') || m.includes('restock') || m.includes('reorder') || m.includes('out of stock') || m.includes('low stock')) {
-    return `📦 **Inventory Management:**
-
-• **Reorder Point** = Average daily sales × Lead time (days) + Safety stock
-• Go to **Inventory** page to see all stock levels at a glance
-• Products with stock ≤ 20 units are flagged as Low Stock — reorder immediately
-• Use **Demand Forecast** to predict how much stock you need for the next 30–90 days
-• **Expiry Tracker** page shows products nearing their expiry date
-
-**Quick rule:** If a product sells 10 units/day and lead time is 3 days, reorder when stock drops to 30.`;
-  }
-
-  // ── Pricing ────────────────────────────────────────────────────────────────
-  if (m.includes('pric') || m.includes('discount') || m.includes('competitor') || m.includes('margin') || m.includes('profit')) {
-    return `💰 **Pricing Strategy:**
-
-• Use **Smart Pricing** page — AI analyzes your cost, stock, and competitor prices
-• Safe margin rule: never price below **Cost Price × 1.15** (15% minimum margin)
-• Competitor scraping: paste a competitor URL in Smart Pricing to fetch their price
-• High stock + low demand → lower price by 5–10% to move inventory
-• Low stock + high demand → you can raise price by 5–8%
-• VIP customers automatically get a **15% discount** at checkout
-• Free shipping for orders above a threshold increases average order value`;
-  }
-
-  // ── Sales & Revenue ────────────────────────────────────────────────────────
-  if (m.includes('sale') || m.includes('revenue') || m.includes('income') || m.includes('earn') || m.includes('money') || m.includes('profit') || m.includes('growth') || m.includes('performance')) {
-    return `📊 **Sales & Revenue Growth:**
-
-• Check today's revenue on the **Dashboard** — shows daily, weekly, monthly trends
-• The **80/20 rule**: your top 20% of products usually drive 80% of revenue
-• Bundle slow-moving items with popular ones to increase order value
-• Use **Customer Segments** to send targeted offers to VIP customers
-• Track cart abandonment — offer free shipping above $50 to reduce drop-offs
-• Re-engage customers who haven't ordered in 30+ days with a special offer`;
-  }
-
-  // ── Orders ─────────────────────────────────────────────────────────────────
-  if (m.includes('order') || m.includes('deliver') || m.includes('ship') || m.includes('fulfil') || m.includes('checkout') || m.includes('payment')) {
-    return `📋 **Order Management:**
-
-• All orders are visible on the **Orders** page — filter by status (pending, processing, shipped, delivered)
-• Stock is automatically deducted when an order is placed (COD and paid orders)
-• You get a real-time notification when a new order arrives (top-right bell icon)
-• VIP customers get free express shipping + 15% discount automatically applied at checkout
-• To update an order status, open the order → change status → save
-
-**Tip:** Prioritize orders with "urgent" stock items to avoid cancellations.`;
-  }
-
-  // ── Customers & Segments ──────────────────────────────────────────────────
-  if (m.includes('customer') || m.includes('churn') || m.includes('loyal') || m.includes('segment') || m.includes('vip') || m.includes('user') || m.includes('buyer')) {
-    return `👥 **Customer Segmentation:**
-
-Your customers are automatically grouped into 4 segments:
-
-• 🆕 **New** — first-time buyers, need onboarding and a welcoming experience
-• 🔄 **Occasional** — buy sometimes, respond well to discounts and reminders
-• ✅ **Regular** — consistent buyers, give them loyalty rewards
-• 👑 **VIP** — top spenders, offer 15% discount + free shipping automatically
-
-Go to **Segments** page to see each group's spending, order count, and behavior.
-Use the **Re-order AI** page to predict when each customer will buy again.`;
-  }
-
-  // ── Demand & Forecast ─────────────────────────────────────────────────────
-  if (m.includes('forecast') || m.includes('demand') || m.includes('predict') || m.includes('trend') || m.includes('future') || m.includes('next')) {
-    return `📈 **Demand Forecasting:**
-
-• Go to **Demand Forecast** → select a product → see AI-powered sales predictions
-• **History slider** (14–90 days): shows actual past sales on the chart
-• **Forecast slider** (7–90 days): shows predicted future demand
-• Trend types:
-  - 📈 Increasing → stock up 15% above forecast total
-  - 📉 Decreasing → reduce next order by 10–15%
-  - ➡️ Stable → maintain current stock + 1 week safety buffer
-• Click **Run AI Forecast** for a Gemini-powered analysis with detailed recommendation`;
-  }
-
-  // ── Feedback ───────────────────────────────────────────────────────────────
-  if (m.includes('feedback') || m.includes('review') || m.includes('complaint') || m.includes('suggestion') || m.includes('rating')) {
-    return `💬 **Feedback Management:**
-
-• Customers can leave anonymous feedback — no account required
-• Go to **Feedback** page to see all messages and reply to them
-• Customers get notified when you reply (badge appears on their Feedback menu)
-• Use feedback to identify top complaints → fix them to reduce churn
-• High-volume feedback about the same product = signal to review its quality or description
-
-**Tip:** Reply within 24 hours — fast responses increase customer trust by 40%.`;
-  }
-
-  // ── Reports / Analytics ───────────────────────────────────────────────────
-  if (m.includes('report') || m.includes('analytic') || m.includes('statistic') || m.includes('data') || m.includes('metric') || m.includes('kpi') || m.includes('dashboard')) {
-    return `📊 **Dashboard & Analytics:**
-
-Your **Dashboard** shows:
-• Total revenue (today / this week / this month)
-• Orders count by status (pending, processing, delivered)
-• Top-selling products with revenue breakdown
-• Customer segment distribution
-• Recent orders with customer details
-
-**Key KPIs to watch daily:**
-• Orders placed today vs. yesterday
-• Revenue trend (are you growing week-over-week?)
-• Low stock alerts (act before stockouts happen)
-• New customer sign-ups vs. returning buyers`;
-  }
-
-  // ── How to use / features ─────────────────────────────────────────────────
-  if (m.includes('how to') || m.includes('how do') || m.includes('what is') || m.includes('explain') || m.includes('feature') || m.includes('use') || m.includes('work')) {
-    return `💡 **AI Commerce — Feature Guide:**
-
-**For Admins & Vendors:**
-• 📊 **Dashboard** — sales overview, top products, revenue charts
-• 📋 **Orders** — manage all orders, update status, view customer details
-• 📦 **Inventory** — track stock, set reorder points, view alerts
-• 💰 **Smart Pricing** — AI-powered pricing with competitor scraping
-• 🤖 **Product AI** — auto-generate descriptions, catalog photos, search images
-• 📈 **Demand Forecast** — predict future sales for any product
-• 📊 **Segments** — view customer groups and their buying behavior
-• ⏰ **Expiry Tracker** — monitor products approaching expiry dates
-
-**For Customers:**
-• 🛍️ **Shop** — browse all products with search and category filters
-• 🔄 **Re-order AI** — AI predicts what you'll need to buy next
-• 🔍 **Visual Search** — upload a photo to find similar products
-• 💬 **AI Assistant** — get help with orders, returns, and products`;
-  }
-
-  // ── Product AI specific ───────────────────────────────────────────────────
-  if (m.includes('description') || m.includes('photo') || m.includes('image') || m.includes('catalog') || m.includes('ai generat')) {
-    return `🤖 **Product AI Features:**
-
-**1. Description Generator:**
-• Select a product from the dropdown OR type any product name
-• Click **Smart Fill** to auto-detect category and features
-• Click **Generate Description** — AI writes short description, full description, bullets, and SEO tags
-• Works even without Gemini key (smart template fallback)
-
-**2. Photo Cataloging:**
-• Upload any product image (drag & drop or click to browse)
-• AI Vision detects product name, category, price range, and features
-• Click "→ Use This Data in Description Generator" to pre-fill the form
-
-**3. Image Search:**
-• Type a product name → get 6 AI-generated product images
-• Click any image to select → download for your catalog`;
-  }
-
-  // ── Default: intelligent general response ─────────────────────────────────
-  const topic = m.length > 3 ? `"${message.slice(0, 60)}${message.length > 60 ? '...' : ''}"` : 'your question';
-  return `I understand you're asking about ${topic}.
-
-Here's what I can help you with right now:
-
-📊 **Sales & Revenue** — "How do I grow my monthly revenue?"
-📦 **Inventory** — "When should I restock this product?"
-💰 **Pricing** — "How do I price competitively?"
-👥 **Customers** — "How do I keep VIP customers engaged?"
-📈 **Forecasting** — "What will demand look like next month?"
-🤖 **Product AI** — "How does the description generator work?"
-📋 **Orders** — "How do I manage pending orders?"
-
-Try rephrasing your question with one of these keywords, or ask something specific about your business!`;
-}
-
-
 // ── Analyze Product Image (Vision AI) ────────────────────────────────────────
 const analyzeProductImage = async (req, res) => {
   try {
@@ -652,31 +451,31 @@ const analyzeProductImage = async (req, res) => {
     const imageBase64 = req.file.buffer.toString('base64');
     const mimeType    = req.file.mimetype || 'image/jpeg';
 
-    const prompt = `You are a product cataloging expert. Analyze this product image carefully.
+    const prompt = `You are an expert e-commerce product cataloging AI. Examine this image carefully and provide an accurate, high-quality product description.
 
-IMPORTANT — READ THE TEXT ON THE IMAGE:
-- If the image shows a BOOK, MAGAZINE, or any printed material, READ the title on the cover and use it EXACTLY as the product_name (e.g. "The Great Gatsby", "Harry Potter and the Sorcerer's Stone", "National Geographic").
-- If the image shows a product with a BRAND NAME or LABEL (e.g. "Sony WH-1000XM5", "Nike Air Max", "Coca-Cola"), read that text and include it in the product_name.
-- Use the exact text you can read from the image — do NOT guess or make up a generic name.
+CRITICAL INSTRUCTIONS:
+1. IDENTIFY THE EXACT ITEM: Look closely at the image.
+   - If there is text, logo, or brand printed on the item or package (e.g. "Sony", "Nike", "Apple", "Samsung", "Coca Cola", book title), read it accurately and include it in "product_name".
+   - If no text is printed, give a clear, precise name of the item (e.g. "Men's Black Leather Running Shoes", "Stainless Steel Electric Kettle", "Floral Summer Cotton Dress").
+   - NEVER return generic placeholders like "Item" or "Product".
 
-CATEGORY DETECTION RULES:
-- SHOES, SNEAKERS, BOOTS, SANDALS, HEELS, FOOTWEAR → category: "Clothing"
-- DRESSES, SHIRTS, PANTS, JACKETS, COATS, SKIRTS, BLOUSES, SUITS → category: "Clothing"
-- HATS, CAPS, SCARVES, GLOVES, BELTS, BAGS, JEWELRY → category: "Clothing"
-- PHONES, LAPTOPS, HEADPHONES, SPEAKERS, CAMERAS, TVS → category: "Electronics"
-- FURNITURE, CHAIRS, TABLES, LAMPS, SOFAS, BEDS → category: "Home & Garden"
-- COSMETICS, SKINCARE, PERFUME, MAKEUP → category: "Beauty & Care"
+2. ACCURATE CATEGORY SELECTION:
+   - Select the EXACT matching category from: Electronics, Clothing, Home & Garden, Food & Beverage, Sports & Fitness, Beauty & Care, Books, Toys, Automotive, Health.
 
-Return ONLY raw JSON (no markdown):
+3. ACCURATE, HIGH-QUALITY DESCRIPTION:
+   - Write a compelling, highly accurate product description based specifically on the item shown in the image (color, material, design, style, intended use).
+   - The bullet points MUST highlight realistic, item-specific features visible or expected for this item.
+
+Return ONLY raw JSON (no markdown, no code fences):
 {
-  "product_name": "the EXACT name/title read from text visible in the image, or the specific product name clearly shown",
-  "category": "one of: Electronics|Clothing|Home & Garden|Food & Beverage|Sports & Fitness|Beauty & Care|Books|Toys|Automotive|Health",
-  "tags": ["5 relevant search tags"],
-  "short_description": "one factual sentence about what you see in the image",
-  "long_description": "2 paragraphs describing the product based on what is visible",
-  "bullet_points": ["4 visible features or attributes from the image"],
-  "suggested_price_range": "realistic price range e.g. $20-$50",
-  "confidence": "high|medium|low"
+  "product_name": "precise, specific name of the item pictured",
+  "category": "Electronics|Clothing|Home & Garden|Food & Beverage|Sports & Fitness|Beauty & Care|Books|Toys|Automotive|Health",
+  "tags": ["5 specific search tags for this item"],
+  "short_description": "A clear, engaging 1-sentence summary of the item",
+  "long_description": "2 detailed paragraphs explaining what the item is, its material/build, style, features, and real-world usage.",
+  "bullet_points": ["5 specific features and specifications of this item"],
+  "suggested_price_range": "realistic market price range e.g. $25-$60",
+  "confidence": "high|medium"
 }`;
 
     const text  = await callGeminiVision(imageBase64, mimeType, prompt);
@@ -774,10 +573,19 @@ Return ONLY raw JSON (no markdown):
 
     // No keyword matched → use a generic "General" category instead of always Electronics
     if (!detectedCategory) detectedCategory = 'General Merchandise';
-    // If filename looks like pure junk (IMG_1234, photo, download, image), mark low confidence
-    const junkPattern = /^(img[_ -]?)?\d{3,}|photo|image|download|screenshot|whatsapp|camera|mobile|phone$/i;
-    const isJunkName = junkPattern.test(cleanName);
-    if (isJunkName && bestScore === 0) detectedCategory = 'General Merchandise';
+    // Check if filename is a generic/junk name (screenshot, img, photo, etc.)
+    const junkPattern = /^(img[_ -]?|photo|image|download|screenshot|whatsapp|camera|mobile|phone|frame|picture|pic|file|capture)/i;
+    const isJunkName = junkPattern.test(cleanName) || /^\d+$/.test(cleanName);
+
+    let finalProductName = cleanName;
+    if (isJunkName) {
+      // Don't show "Screenshot" as the product name! Use a clean placeholder or category-based name
+      if (detectedCategory && detectedCategory !== 'General Merchandise') {
+        finalProductName = `${detectedCategory} Item`;
+      } else {
+        finalProductName = 'Uploaded Product';
+      }
+    }
 
     // Category-specific realistic templates
     const templates = {
@@ -918,14 +726,14 @@ Return ONLY raw JSON (no markdown):
     const template = templates[detectedCategory] || templates['Electronics'];
 
     res.json({
-      product_name: productName,
+      product_name: finalProductName,
       category: detectedCategory,
-      tags: template.tags,
-      short_description: template.short_description,
-      long_description: `${template.short_description} This ${detectedCategory.toLowerCase()} item was detected from your uploaded photo. The AI cataloging system analyzed the image and identified the product category and name from the filename. For even more accurate analysis with specific feature recognition, connect a GEMINI_API_KEY to the server.`,
-      bullet_points: template.bullet_points,
+      tags: [finalProductName.toLowerCase(), detectedCategory.toLowerCase(), 'product', 'catalog', 'item'],
+      short_description: template.short_description.replace(productName, finalProductName),
+      long_description: `${template.short_description.replace(productName, finalProductName)} This ${detectedCategory.toLowerCase()} item was detected from your uploaded photo. You can edit the product name and category above before generating the full description.`,
+      bullet_points: template.bullet_points.map(b => b.replace(productName, finalProductName)),
       suggested_price_range: template.price,
-      confidence: 'medium',
+      confidence: isJunkName ? 'medium' : 'high',
     });
   }
 };

@@ -11,14 +11,7 @@ const adminNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/demand',       icon: '📈', label: 'Demand Forecast' },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  {
-    path: '/admin/product-ai', icon: '🤖', label: 'Product AI',
-    subItems: [
-      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
-      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
-      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
-    ],
-  },
+  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/segments',     icon: '📊', label: 'Segments'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
@@ -31,14 +24,7 @@ const vendorNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/expiry',       icon: '⏰', label: 'Expiry Tracker'  },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  {
-    path: '/admin/product-ai', icon: '🤖', label: 'Product AI',
-    subItems: [
-      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
-      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
-      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
-    ],
-  },
+  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
   { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },

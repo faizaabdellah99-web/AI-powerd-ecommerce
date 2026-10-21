@@ -36,8 +36,7 @@ export default function CustomerDashboard() {
   const [loading, setLoading] = useState(true);
   const [loadingOrders, setLoadingOrders] = useState(true);
   const [ordersError, setOrdersError] = useState('');
-  const [aiSuggestions, setAiSuggestions] = useState(null);
-  const [aiSuggestionsLoading, setAiSuggestionsLoading] = useState(false);
+  
 
   useEffect(() => {
     let active = true;
@@ -87,54 +86,7 @@ export default function CustomerDashboard() {
   const recommendations = segmentData?.recommendations || user?.recommendations || [];
   const segStyle = segmentColors[segment?.key] || segmentColors.regular;
 
-  // ── AI Suggestions (personalized per customer) ─────────────────────────────
-  const fetchAISuggestions = async () => {
-    setAiSuggestionsLoading(true);
-    try {
-      const catStr = categories.slice(0, 5).join(', ');
-      const { data } = await api.post('/ai/chat', {
-        message: `You are a personal AI shopping assistant. Generate exactly 4 actionable, personalized suggestions for this customer:
-- Name: ${user?.name || 'Customer'}
-- Segment: ${segment?.label || 'General Customer'}
-- Total orders: ${stats.totalOrders || 0}
-- Total spent: $${(stats.totalSpent || 0).toFixed(2)}
-- Avg order value: $${(stats.avgOrder || 0).toFixed(2)}
-- Favorite categories: ${catStr || 'General Merchandise'}
-- Days since last order: ${stats.daysSinceLastOrder !== null && stats.daysSinceLastOrder !== undefined ? `${stats.daysSinceLastOrder} days` : 'N/A'}
-- Existing recommendations: ${(recommendations || []).slice(0, 3).join('; ') || 'None yet'}
-
-Return ONLY a JSON array of exactly 4 objects, no markdown:
-[{"icon":"emoji","title":"short title","text":"one specific actionable sentence with numbers personal to this customer","color":"hex color"}]
-Use these colors: #6366f1, #10b981, #f59e0b, #ef4444
-Make each suggestion specific and personal — reference their segment, spending, categories, or reorder timing.`,
-        history: [],
-        context: 'customer dashboard personalized suggestions',
-      });
-      const match = data.reply.match(/\[[\s\S]*\]/);
-      if (match) {
-        const parsed = JSON.parse(match[0]);
-        if (Array.isArray(parsed) && parsed.length >= 4) setAiSuggestions(parsed.slice(0, 4));
-        else throw new Error('parse error');
-      } else {
-        throw new Error('parse error');
-      }
-    } catch {
-      // Fallback personalized suggestions if AI is unavailable
-      setAiSuggestions([
-        { icon: '🛍️', title: 'Shop Your Favorites', text: `Discover top new arrivals in ${categories[0] || 'your favorite categories'} — updated daily.`, color: '#6366f1' },
-        { icon: '💰', title: 'Segment Reward', text: `As a ${segStyle.label.replace(/Customer|Shopper/g, '').trim() || 'valued'} customer, enjoy up to 10% off your next order.`, color: '#f59e0b' },
-        { icon: '🔄', title: 'Smart Reorder', text: stats.daysSinceLastOrder != null ? `It's been ${stats.daysSinceLastOrder} days since your last order — time to restock with Reorder AI.` : 'Use Reorder AI to save time on repeat purchases.', color: '#10b981' },
-        { icon: '⭐', title: 'Maximize Rewards', text: 'Use the AI Assistant to find the best deals across your favorite categories.', color: '#ef4444' },
-      ]);
-    } finally {
-      setAiSuggestionsLoading(false);
-    }
-  };
-
-  // Auto-generate personalized suggestions once profile data is ready
-  useEffect(() => {
-    if (!loading) fetchAISuggestions();
-  }, [loading]);
+  
 
   return (
     <Layout title={`Hi, ${user?.name?.split(' ')[0] || 'there'} 👋`} subtitle="Your personal AI shopping assistant">
@@ -192,86 +144,7 @@ Make each suggestion specific and personal — reference their segment, spending
         <StatCard label="AI Suggestions" value={recommendations.length || 0} icon="🤖" color="var(--danger)" />
       </div>
 
-      {/* ── AI Suggestions For You (4 personalized tips) ── */}
-      <Card style={{ marginBottom: 20 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
-          <div>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>🤖 AI Suggestions For You</div>
-            <div style={{ fontSize: 12, color: 'var(--text3)', marginTop: 3 }}>
-              Personalized just for you — based on your segment, spending & preferences
-            </div>
-          </div>
-          <button onClick={fetchAISuggestions} disabled={aiSuggestionsLoading} style={{
-            display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px',
-            borderRadius: 8, border: 'none', cursor: aiSuggestionsLoading ? 'not-allowed' : 'pointer',
-            background: aiSuggestionsLoading ? 'var(--bg3)' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
-            color: aiSuggestionsLoading ? 'var(--text3)' : '#fff',
-            fontSize: 12, fontWeight: 700, transition: 'opacity 0.2s',
-          }}>
-            {aiSuggestionsLoading ? '⏳ Generating…' : aiSuggestions ? '✦ Refresh' : '✦ Generate AI Suggestions'}
-          </button>
-        </div>
-
-        <style>{`@keyframes suggestionFade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}`}</style>
-
-        {aiSuggestionsLoading && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} style={{ display: 'flex', gap: 10, padding: '12px', borderRadius: 10, background: 'var(--bg3)' }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: 'var(--border)', animation: 'pulse 1.5s infinite', flexShrink: 0 }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ height: 11, background: 'var(--border)', borderRadius: 4, marginBottom: 6, animation: 'pulse 1.5s infinite' }} />
-                  <div style={{ height: 9, background: 'var(--border)', borderRadius: 4, width: '85%', animation: 'pulse 1.5s infinite' }} />
-                </div>
-              </div>
-            ))}
-            <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}`}</style>
-          </div>
-        )}
-
-        {!aiSuggestions && !aiSuggestionsLoading && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {[
-              { icon: '🛍️', title: 'Personalized Picks', desc: 'AI discovers products you\'ll love from your favorite categories.', color: '#6366f1' },
-              { icon: '💰', title: 'Exclusive Deals', desc: 'Get offers tailored to your spending habits and segment.', color: '#f59e0b' },
-              { icon: '🔄', title: 'Smart Reorder Alerts', desc: 'Never run out — get reminded when it\'s time to reorder.', color: '#10b981' },
-              { icon: '⭐', title: 'Loyalty Rewards', desc: 'AI finds the best ways for you to earn and save points.', color: '#ef4444' },
-            ].map((item, i) => (
-              <div key={i} style={{ display: 'flex', gap: 10, padding: '12px', borderRadius: 10, background: 'var(--bg3)', border: `1px solid ${item.color}33` }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: item.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>{item.icon}</div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', marginBottom: 2 }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>{item.desc}</div>
-                </div>
-              </div>
-            ))}
-            <div style={{ gridColumn: '1/-1', fontSize: 10, color: 'var(--text3)', textAlign: 'center', padding: '6px', background: 'var(--bg3)', borderRadius: 8 }}>
-              Click ✦ Generate for live personalized AI suggestions
-            </div>
-          </div>
-        )}
-
-        {aiSuggestions && !aiSuggestionsLoading && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            {aiSuggestions.map((item, i) => (
-              <div key={i} style={{
-                display: 'flex', gap: 10, padding: '12px', borderRadius: 10,
-                background: 'var(--bg3)', border: `1px solid ${item.color}33`,
-                animation: 'suggestionFade 0.3s ease', animationDelay: `${i * 0.08}s`, animationFillMode: 'both',
-              }}>
-                <div style={{ width: 36, height: 36, borderRadius: 9, background: item.color + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>{item.icon}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: item.color, marginBottom: 3 }}>{item.title}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text2)', lineHeight: 1.5 }}>{item.text}</div>
-                </div>
-              </div>
-            ))}
-            <div style={{ gridColumn: '1/-1', fontSize: 10, color: 'var(--text3)', textAlign: 'right' }}>
-              ✦ AI Personalized • {segment?.label || 'Customer'}
-            </div>
-          </div>
-        )}
-      </Card>
+      
 
       {/* Segment Benefits & Recommendations */}
       {segment?.benefits && segment.benefits.length > 0 && (

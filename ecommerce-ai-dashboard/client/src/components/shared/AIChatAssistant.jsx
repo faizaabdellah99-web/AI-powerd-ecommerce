@@ -7,6 +7,7 @@ const SUGGESTED = [
   'Which products have the highest demand?',
   'Analyze my sales performance',
   'How to reduce customer churn?',
+  'How do I increase my revenue?',
 ];
 
 function TypingIndicator() {
@@ -84,7 +85,7 @@ export default function AIChatAssistant({ context = 'general' }) {
   const [messages, setMessages] = useState([
     {
       role: 'assistant',
-      content: '👋 Hi! I\'m your AI assistant.\n\nI can help you with sales insights, pricing strategies, inventory analysis, and more. What would you like to know?',
+      content: '👋 Hi! I\'m your AI assistant.\n\nI can help you with sales insights, pricing strategies, inventory analysis, demand forecasting, customer retention, and more. What would you like to know?',
       timestamp: new Date().toISOString(),
     },
   ]);
@@ -123,9 +124,20 @@ export default function AIChatAssistant({ context = 'general' }) {
         timestamp: data.timestamp,
       }]);
     } catch (err) {
+      const status = err.response?.status;
+      let errorMsg;
+      if (!err.response) {
+        errorMsg = '⚠️ Cannot reach the server.\n\nMake sure the server is running:\n  cd server\n  npm run dev';
+      } else if (status === 401 || status === 403) {
+        errorMsg = '🔒 Session expired. Please log in again.';
+      } else if (status === 404) {
+        errorMsg = '🔍 AI chat endpoint not found.\n\nRestart the server:\n  cd server\n  npm run dev';
+      } else {
+        errorMsg = '❌ ' + (err.response?.data?.message || 'Something went wrong') + '\n\nThe AI will use smart local answers when Gemini is unavailable.';
+      }
       setMessages(prev => [...prev, {
         role: 'assistant',
-        content: '❌ Sorry, I encountered an error. Please make sure the server is running and AI_API_KEY is configured.\n\n' + (err.response?.data?.message || err.message),
+        content: errorMsg,
         timestamp: new Date().toISOString(),
       }]);
     } finally {

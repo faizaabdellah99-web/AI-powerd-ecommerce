@@ -20,6 +20,8 @@ import AdminSegmentBenefitsPage from './pages/admin/AdminSegmentBenefitsPage';
 import AdminOrdersPage      from './pages/admin/AdminOrdersPage';
 import ExpiryTrackerPage    from './pages/admin/ExpiryTrackerPage';
 import FeedbackAdminPage    from './pages/admin/FeedbackAdminPage';
+import DemoDescriptionPage  from './pages/admin/DemoDescriptionPage';
+import PhotoCatalogPage     from './pages/admin/PhotoCatalogPage';
 
 // ── Customer pages ─────────────────────────────────────────────────────────
 import CustomerDashboard    from './pages/customer/CustomerDashboard';
@@ -64,6 +66,8 @@ export default function App() {
             <Route path="segment-benefits"  element={<AdminSegmentBenefitsPage />} />
             <Route path="feedback"          element={<FeedbackAdminPage />} />
             <Route path="ai-chat"           element={<AIChatPage />} />
+            <Route path="demo-description"  element={<DemoDescriptionPage />} />
+            <Route path="photo-catalog"     element={<PhotoCatalogPage />} />
           </Route>
 
           {/* ── Customer routes ── */}

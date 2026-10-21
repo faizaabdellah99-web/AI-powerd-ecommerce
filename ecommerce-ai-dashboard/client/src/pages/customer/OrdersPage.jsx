@@ -211,28 +211,6 @@ export default function OrdersPage() {
   return (
     <Layout title="📋 My Orders" subtitle="Track your purchases and delivery status">
 
-      {/* Demo button for testing */}
-      <div style={{ marginBottom: 16 }}>
-        <button 
-          onClick={() => {
-            const socket = getSocket();
-            // Simulate order status update from admin
-            socket.emit('order-status-updated', { orderId: 'DEMO-001', status: 'shipped' });
-          }}
-          style={{
-            padding: '8px 16px',
-            background: 'var(--warning)',
-            color: '#fff',
-            border: 'none',
-            borderRadius: 8,
-            fontSize: 12,
-            cursor: 'pointer',
-            fontWeight: 600
-          }}
-        >
-          🎭 Demo: Simulate Order Status Update
-        </button>
-      </div>
 
       {/* Stats */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14, marginBottom:20 }}>

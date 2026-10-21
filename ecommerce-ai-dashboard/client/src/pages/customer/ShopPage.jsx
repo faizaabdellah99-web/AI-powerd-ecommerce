@@ -74,7 +74,6 @@ function Stars({ rating }) {
 
 function ProductCard({ p, onAdd, qty, onOpenDetail }) {
   const [hover, setHover] = useState(false);
-  const outOfStock = (p.stock ?? 0) === 0;
 
   const expiryInfo = (() => {
     if (!p.expiryDate) return null;
@@ -90,22 +89,20 @@ function ProductCard({ p, onAdd, qty, onOpenDetail }) {
     <div onMouseEnter={()=>setHover(true)} onMouseLeave={()=>setHover(false)}
       onClick={() => onOpenDetail && onOpenDetail(p)}
       style={{
-      background:hover&&!outOfStock?'var(--bg2)':'var(--card)',
-      border:`1px solid ${hover&&!outOfStock?'var(--primary)':'var(--border)'}`,
+      background:hover?'var(--bg2)':'var(--card)',
+      border:`1px solid ${hover?'var(--primary)':'var(--border)'}`,
       borderRadius:14, overflow:'hidden', position:'relative', transition:'all 0.18s',
-      boxShadow:hover&&!outOfStock?'0 8px 28px rgba(99,102,241,0.18)':'none',
-      transform:hover&&!outOfStock?'translateY(-2px)':'translateY(0)',
-      display:'flex', flexDirection:'column', opacity: outOfStock ? 0.72 : 1,
+      boxShadow:hover?'0 8px 28px rgba(99,102,241,0.18)':'none',
+      transform:hover?'translateY(-2px)':'translateY(0)',
+      display:'flex', flexDirection:'column',
     }}>
       {/* Badges */}
-      {outOfStock && <div style={{ position:'absolute',top:10,left:10,zIndex:3,background:'#ef4444cc',color:'#fff',fontSize:10,fontWeight:800,padding:'3px 9px',borderRadius:20 }}>⚠️ Out of Stock</div>}
-      {!outOfStock && p.isAiPick && <div style={{ position:'absolute',top:10,left:10,zIndex:2,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>⚡ AI pick</div>}
-      {!outOfStock && p.isNew    && <div style={{ position:'absolute',top:10,right:10,zIndex:2,background:'#10b981',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>New</div>}
-      {!outOfStock && expiryInfo?.badge && <div style={{ position:'absolute',top: p.isNew?34:10,right:10,zIndex:2,background:expiryInfo.badgeColor+'22',color:expiryInfo.badgeColor,fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,border:`1px solid ${expiryInfo.badgeColor}44` }}>{expiryInfo.badge}</div>}
+      {p.isAiPick && <div style={{ position:'absolute',top:10,left:10,zIndex:2,background:'linear-gradient(135deg,#6366f1,#8b5cf6)',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>⚡ AI pick</div>}
+      {p.isNew    && <div style={{ position:'absolute',top:10,right:10,zIndex:2,background:'#10b981',color:'#fff',fontSize:10,fontWeight:700,padding:'3px 9px',borderRadius:20 }}>New</div>}
+      {expiryInfo?.badge && <div style={{ position:'absolute',top: p.isNew?34:10,right:10,zIndex:2,background:expiryInfo.badgeColor+'22',color:expiryInfo.badgeColor,fontSize:10,fontWeight:700,padding:'3px 8px',borderRadius:20,border:`1px solid ${expiryInfo.badgeColor}44` }}>{expiryInfo.badge}</div>}
 
       {/* Image */}
       <div style={{ height:170,background:'var(--bg3)',display:'flex',alignItems:'center',justifyContent:'center',overflow:'hidden',position:'relative' }}>
-        {outOfStock && <div style={{ position:'absolute',inset:0,background:'rgba(0,0,0,0.3)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:2 }}><span style={{ color:'#fff',fontWeight:800,fontSize:13,background:'#ef4444bb',padding:'5px 14px',borderRadius:20 }}>OUT OF STOCK</span></div>}
         {p.imageUrl ? (
           <img src={p.imageUrl} alt={p.name} style={{ width:'100%',height:'100%',objectFit:'cover',position:'absolute',top:0,left:0 }} onError={e=>e.target.style.display='none'} />
         ) : (
@@ -148,18 +145,18 @@ function ProductCard({ p, onAdd, qty, onOpenDetail }) {
 
         <div style={{ display:'flex',alignItems:'center',justifyContent:'space-between' }}>
           <div>
-            <span style={{ fontSize:19,fontWeight:800,color:outOfStock?'var(--text3)':'var(--primary)' }}>${p.price}</span>
-            {!outOfStock && p.stock > 0 && p.stock <= 5 && (
+            <span style={{ fontSize:19,fontWeight:800,color:'var(--primary)' }}>${p.price}</span>
+            {p.stock > 0 && p.stock <= 5 && (
               <div style={{ fontSize:10,color:'#f97316',fontWeight:700,marginTop:1 }}>⚠️ Only {p.stock} left!</div>
             )}
           </div>
-          <button onClick={e=>{e.stopPropagation();if(!outOfStock)onAdd(p);}} disabled={outOfStock} style={{
+          <button onClick={e=>{e.stopPropagation();onAdd(p);}} style={{
             padding:'8px 14px', borderRadius:9, border:'none', fontWeight:700, fontSize:11, transition:'all 0.15s',
-            cursor: outOfStock?'not-allowed':'pointer',
-            background: outOfStock?'var(--bg3)': qty>0?'var(--success)':'var(--primary)',
-            color: outOfStock?'var(--text3)':'#fff',
+            cursor:'pointer',
+            background: qty>0?'var(--success)':'var(--primary)',
+            color:'#fff',
           }}>
-            {outOfStock ? '❌ Out of Stock' : qty>0 ? `✓ ${qty} in cart` : 'Add to cart'}
+            {qty>0 ? `✓ ${qty} in cart` : 'Add to cart'}
           </button>
         </div>
       </div>
@@ -202,7 +199,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, inCart, qty }) {
     } finally { setSubmitting(false); }
   };
 
-  const outOfStock = (product?.stock ?? 0) === 0;
   const avgRating  = product?.rating || 0;
   const reviewCount= reviews.length;
 
@@ -227,7 +223,6 @@ function ProductDetailModal({ product, onClose, onAddToCart, inCart, qty }) {
           {/* Image + price row */}
           <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:20, marginBottom:20 }}>
             <div style={{ borderRadius:14, overflow:'hidden', background:'var(--bg3)', height:200, display:'flex', alignItems:'center', justifyContent:'center', position:'relative' }}>
-              {outOfStock && <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:2 }}><span style={{ color:'#fff', fontWeight:800, fontSize:13, background:'#ef4444bb', padding:'5px 12px', borderRadius:20 }}>OUT OF STOCK</span></div>}
               {product.imageUrl
                 ? <img src={product.imageUrl} alt={product.name} style={{ width:'100%', height:'100%', objectFit:'cover' }} onError={e=>e.target.style.display='none'} />
                 : <ProductImage name={product.name} category={product.category} size={120} borderRadius={10} />
@@ -235,7 +230,7 @@ function ProductDetailModal({ product, onClose, onAddToCart, inCart, qty }) {
             </div>
             <div>
               {/* Price */}
-              <div style={{ fontSize:28, fontWeight:900, color:outOfStock?'var(--text3)':'var(--primary)', marginBottom:8 }}>${product.price}</div>
+              <div style={{ fontSize:28, fontWeight:900, color:'var(--primary)', marginBottom:8 }}>${product.price}</div>
 
               {/* Rating summary */}
               <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:12 }}>
@@ -273,14 +268,14 @@ function ProductDetailModal({ product, onClose, onAddToCart, inCart, qty }) {
               )}
 
               {/* Add to cart */}
-              <button onClick={()=>{ if(!outOfStock){ onAddToCart(product); toast.success(`${product.name} added to cart!`); }}} disabled={outOfStock} style={{
+              <button onClick={()=>{ onAddToCart(product); toast.success(`${product.name} added to cart!`); }} style={{
                 width:'100%', padding:'12px', borderRadius:11, border:'none', fontWeight:800, fontSize:15,
-                cursor:outOfStock?'not-allowed':'pointer', transition:'all 0.15s',
-                background:outOfStock?'var(--bg3)':qty>0?'var(--success)':'linear-gradient(135deg,#6366f1,#8b5cf6)',
-                color:outOfStock?'var(--text3)':'#fff',
-                boxShadow:outOfStock||qty>0?'none':'0 4px 16px rgba(99,102,241,0.4)',
+                cursor:'pointer', transition:'all 0.15s',
+                background:qty>0?'var(--success)':'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                color:'#fff',
+                boxShadow:qty>0?'none':'0 4px 16px rgba(99,102,241,0.4)',
               }}>
-                {outOfStock ? '❌ Out of Stock' : qty>0 ? `✓ ${qty} in cart — Add more` : '🛒 Add to Cart'}
+                {qty>0 ? `✓ ${qty} in cart — Add more` : '🛒 Add to Cart'}
               </button>
             </div>
           </div>
@@ -399,6 +394,7 @@ export default function ShopPage() {
   const [category,  setCategory]  = useState('All products');
   const [sort,      setSort]      = useState('AI recommended');
   const [search,    setSearch]    = useState('');
+  const [minPrice,  setMinPrice]  = useState(0);
   const [maxPrice,  setMaxPrice]  = useState(1000);
   const [minRating, setMinRating] = useState(0);
   const [cart,      setCart]      = useState({});
@@ -478,7 +474,8 @@ export default function ShopPage() {
     let list = allProducts;
     if (category !== 'All products') list = list.filter(p => p.category === category);
     if (search.trim()) list = list.filter(p => fuzzyMatch(search, p));
-    list = list.filter(p => p.price <= maxPrice && p.rating >= minRating);
+    list = list.filter(p => p.price >= minPrice && p.price <= maxPrice && p.rating >= minRating);
+    list = list.filter(p => (p.stock ?? 0) > 0); // Filter out out-of-stock items
     if (aiOnly) list = list.filter(p => p.isAiPick);
     switch (sort) {
       case 'Price: Low to High': return [...list].sort((a,b)=>a.price-b.price);
@@ -487,12 +484,26 @@ export default function ShopPage() {
       case 'Most Reviews':       return [...list].sort((a,b)=>b.reviews-a.reviews);
       default: return [...list].sort((a,b)=>(b.isAiPick?1:0)-(a.isAiPick?1:0));
     }
-  }, [allProducts, category, sort, search, maxPrice, minRating, aiOnly]);
+  }, [allProducts, category, sort, search, minPrice, maxPrice, minRating, aiOnly]);
 
   const recommendations = useMemo(() => ({
-    liked:   allProducts.filter(p=>PURCHASE_HISTORY.includes(p.category)&&!RECENTLY_VIEWED.includes(p.id)).sort((a,b)=>b.rating-a.rating).slice(0,4),
-    together:allProducts.filter(p=>!PURCHASE_HISTORY.includes(p.category)&&p.isAiPick).slice(0,3),
+    liked:   allProducts.filter(p=>PURCHASE_HISTORY.includes(p.category)&&!RECENTLY_VIEWED.includes(p.id)&&(p.stock??0)>0).sort((a,b)=>b.rating-a.rating).slice(0,4),
+    together:allProducts.filter(p=>!PURCHASE_HISTORY.includes(p.category)&&p.isAiPick&&(p.stock??0)>0).slice(0,3),
   }), [allProducts]);
+
+  // Calculate dynamic max price from products
+  const maxAvailablePrice = useMemo(() => {
+    if (allProducts.length === 0) return 1000;
+    const max = Math.max(...allProducts.map(p => p.price));
+    return Math.ceil(max / 100) * 100; // Round up to nearest 100
+  }, [allProducts]);
+
+  // Initialize maxPrice on products load
+  useEffect(() => {
+    if (maxAvailablePrice > 0 && maxPrice === 1000) {
+      setMaxPrice(maxAvailablePrice);
+    }
+  }, [maxAvailablePrice, maxPrice]);
 
   return (
     <div style={{ minHeight:'100vh', background:'var(--bg)', color:'var(--text)' }}>
@@ -554,15 +565,129 @@ export default function ShopPage() {
           </div>
           <div style={{ marginBottom:24 }}>
             <div style={{ fontSize:10,fontWeight:700,color:'var(--text3)',letterSpacing:1,marginBottom:10 }}>PRICE RANGE</div>
-            <div style={{ display:'flex',justifyContent:'space-between',fontSize:12,color:'var(--text2)',marginBottom:8 }}><span>$0</span><span style={{ fontWeight:700,color:'var(--text)' }}>${maxPrice}</span></div>
-            <input type="range" min={0} max={1000} step={10} value={maxPrice} onChange={e=>setMaxPrice(+e.target.value)} style={{ width:'100%',accentColor:'var(--primary)' }} />
+            
+            {/* Min/Max Inputs */}
+            <div style={{ display:'flex',gap:8,marginBottom:10 }}>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:10,color:'var(--text3)',marginBottom:4 }}>Min</div>
+                <input 
+                  type="number" 
+                  min={0} 
+                  max={maxAvailablePrice}
+                  value={minPrice} 
+                  onChange={e=>{
+                    const val = Math.max(0, Math.min(maxAvailablePrice, +e.target.value || 0));
+                    setMinPrice(val);
+                    if (val > maxPrice) setMaxPrice(val);
+                  }}
+                  style={{ 
+                    width:'100%',padding:'6px 10px',borderRadius:8,
+                    background:'var(--bg3)',border:'1px solid var(--border)',
+                    color:'var(--text)',fontSize:12,outline:'none' 
+                  }}
+                />
+              </div>
+              <div style={{ flex:1 }}>
+                <div style={{ fontSize:10,color:'var(--text3)',marginBottom:4 }}>Max</div>
+                <input 
+                  type="number" 
+                  min={0} 
+                  max={maxAvailablePrice}
+                  value={maxPrice} 
+                  onChange={e=>{
+                    const val = Math.max(0, Math.min(maxAvailablePrice, +e.target.value || 0));
+                    setMaxPrice(val);
+                    if (val < minPrice) setMinPrice(val);
+                  }}
+                  style={{ 
+                    width:'100%',padding:'6px 10px',borderRadius:8,
+                    background:'var(--bg3)',border:'1px solid var(--border)',
+                    color:'var(--text)',fontSize:12,outline:'none' 
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Dual Range Slider */}
+            <div style={{ position:'relative',height:'24px',marginBottom:8 }}>
+              {/* Track */}
+              <div style={{ 
+                position:'absolute',top:10,left:0,right:0,height:4,
+                background:'var(--bg3)',borderRadius:2 
+              }} />
+              {/* Active track */}
+              <div style={{ 
+                position:'absolute',top:10,
+                left:`${(minPrice/maxAvailablePrice)*100}%`,
+                width:`${((maxPrice-minPrice)/maxAvailablePrice)*100}%`,
+                height:4,
+                background:'var(--primary)',borderRadius:2 
+              }} />
+              {/* Min slider */}
+              <input 
+                type="range" 
+                min={0} 
+                max={maxAvailablePrice} 
+                step={10}
+                value={minPrice} 
+                onChange={e=>{
+                  const val = +e.target.value;
+                  if (val <= maxPrice) setMinPrice(val);
+                }}
+                style={{ 
+                  position:'absolute',top:0,left:0,width:'100%',height:24,
+                  opacity:0,cursor:'pointer',pointerEvents:'auto',WebkitAppearance:'none',
+                  zIndex:1
+                }}
+              />
+              {/* Max slider */}
+              <input 
+                type="range" 
+                min={0} 
+                max={maxAvailablePrice} 
+                step={10}
+                value={maxPrice} 
+                onChange={e=>{
+                  const val = +e.target.value;
+                  if (val >= minPrice) setMaxPrice(val);
+                }}
+                style={{ 
+                  position:'absolute',top:0,left:0,width:'100%',height:24,
+                  opacity:0,cursor:'pointer',pointerEvents:'auto',WebkitAppearance:'none',
+                  zIndex:2
+                }}
+              />
+              {/* Custom thumbs */}
+              <div style={{ 
+                position:'absolute',top:8,
+                left:`${(minPrice/maxAvailablePrice)*100}%`,
+                width:14,height:14,
+                background:'var(--card)',border:'2px solid var(--primary)',
+                borderRadius:'50%',transform:'translateX(-50%)',pointerEvents:'none',
+                boxShadow:'0 2px 6px rgba(0,0,0,0.2)',
+                zIndex:3
+              }} />
+              <div style={{ 
+                position:'absolute',top:8,
+                left:`${(maxPrice/maxAvailablePrice)*100}%`,
+                width:14,height:14,
+                background:'var(--card)',border:'2px solid var(--primary)',
+                borderRadius:'50%',transform:'translateX(-50%)',pointerEvents:'none',
+                boxShadow:'0 2px 6px rgba(0,0,0,0.2)',
+                zIndex:3
+              }} />
+            </div>
+
+            <div style={{ fontSize:11,color:'var(--text3)',marginTop:6 }}>
+              ${minPrice} - ${maxPrice} range
+            </div>
           </div>
           <div>
             <div style={{ fontSize:10,fontWeight:700,color:'var(--text3)',letterSpacing:1,marginBottom:10 }}>RATING</div>
-            {[[0,'⭐ Any rating'],[4,'⭐ 4+ stars'],[4.5,'⭐ 4.5+ stars']].map(([v,l])=>(
+            {[[0,'⭐ Any rating'],[3,'⭐ 3+ stars'],[4,'⭐ 4+ stars'],[4.5,'⭐ 4.5+ stars']].map(([v,l])=>(
               <button key={v} onClick={()=>setMinRating(v)} style={{
-                display:'flex',alignItems:'center',gap:8,width:'100%',padding:'9px 12px',borderRadius:9,border:'none',cursor:'pointer',marginBottom:3,
-                fontSize:12,fontWeight:minRating===v?700:400,background:minRating===v?'var(--primary)':'transparent',color:minRating===v?'#fff':'var(--text2)',textAlign:'left',transition:'all 0.1s',
+                display:'flex',alignItems:'center',gap:8,width:'100%',padding:'9px 12px',borderRadius:9,border:`1px solid ${minRating===v?'var(--primary)':'var(--border)'}`,cursor:'pointer',marginBottom:3,
+                fontSize:12,fontWeight:minRating===v?700:400,background:minRating===v?'var(--primary)':'transparent',color:minRating===v?'#fff':'var(--text2)',textAlign:'left',transition:'all 0.15s',
               }}>{l}</button>
             ))}
           </div>

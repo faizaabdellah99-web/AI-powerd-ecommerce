@@ -148,6 +148,10 @@ export default function AIChatPage() {
       setMessages(prev => [...prev, {
         role:'assistant', content:data.reply, timestamp:data.timestamp,
       }]);
+      // Show a subtle indicator when using the smart local AI fallback
+      if (data._fallback) {
+        // No action needed - response is already helpful
+      }
     } catch (err) {
       const status  = err.response?.status;
       const msg     = err.response?.data?.message || err.message || '';

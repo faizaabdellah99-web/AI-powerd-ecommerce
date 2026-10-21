@@ -60,11 +60,28 @@ export default function LoginPage() {
   };
 
   const handleForgotPassword = () => {
+    const knownPasswords = {
+      'admin@demo.com': 'demo123',
+      'vendor@demo.com': 'demo123',
+      'customer@demo.com': 'demo123',
+      'admin@gmail.com': 'ABC123',
+      'vendor@gmail.com': 'ABC123',
+      'mira@gmail.com': 'ABC123',
+    };
+
     if (!form.email) {
       toast.error('Please enter your email address first', { icon:'⚠️' });
       return;
     }
-    toast.success(`Password reset link sent to ${form.email}`, { icon:'📧' });
+
+    const emailLower = form.email.toLowerCase().trim();
+    const foundPw = knownPasswords[emailLower] || 'demo123';
+
+    // Auto fill the password field and reveal it
+    setForm(p => ({ ...p, password: foundPw }));
+    setShowPw(true);
+
+    toast.success(`Your password is: ${foundPw}`, { icon:'🔑', duration: 5000 });
   };
 
   const demoFill = (role) => {
@@ -129,12 +146,6 @@ export default function LoginPage() {
           ))}
         </div>
 
-        {/* Bottom tag */}
-        <div style={{ marginTop:40, display:'flex', alignItems:'center', gap:10, animation:'fadeUp 0.6s ease 0.4s both' }}>
-          <div style={{ height:1, width:60, background:'rgba(255,255,255,0.15)' }} />
-          <span style={{ fontSize:12, color:'#64748b' }}>Full-stack MERN + AI</span>
-          <div style={{ height:1, width:60, background:'rgba(255,255,255,0.15)' }} />
-        </div>
       </div>
 
       {/* ── RIGHT PANEL (form) ── */}
@@ -249,10 +260,6 @@ export default function LoginPage() {
               <div style={{ fontSize:10, color:'var(--text3)' }}>{d.email}</div>
             </button>
           ))}
-        </div>
-        {/* Credentials hint */}
-        <div style={{ fontSize:11, color:'var(--text3)', textAlign:'center', marginBottom:12, padding:'8px 12px', background:'var(--bg3)', borderRadius:8 }}>
-          💡 All demo accounts use password: <strong style={{ color:'var(--text2)' }}>demo123</strong>
         </div>
 
         {/* Register link */}
