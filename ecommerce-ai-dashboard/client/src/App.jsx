@@ -8,6 +8,8 @@ import RegisterPage from './pages/auth/RegisterPage';
 
 // ── Admin pages ────────────────────────────────────────────────────────────
 import AdminDashboard       from './pages/admin/AdminDashboard';
+import UserManagementPage   from './pages/admin/UserManagementPage';
+import AddVendorPage        from './pages/admin/AddVendorPage';
 import DemandForecastPage   from './pages/admin/DemandForecastPage';
 import SmartPricingPage     from './pages/admin/SmartPricingPage';
 import ProductAIPage        from './pages/admin/ProductAIPage';
@@ -55,6 +57,8 @@ export default function App() {
           {/* ── Admin routes ── */}
           <Route path="/admin" element={<ProtectedRoute roles={['admin','vendor']} />}>
             <Route index                    element={<AdminDashboard />} />
+            <Route path="users"             element={<UserManagementPage />} />
+            <Route path="add-vendor"        element={<AddVendorPage />} />
             <Route path="orders"            element={<AdminOrdersPage />} />
             <Route path="inventory"         element={<InventoryPage />} />
             <Route path="expiry"            element={<ExpiryTrackerPage />} />

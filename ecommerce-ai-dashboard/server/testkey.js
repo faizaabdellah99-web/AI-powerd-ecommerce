@@ -1,5 +1,7 @@
 require('dotenv').config();
 const axios = require('axios');
+const https = require('https');
+const agent = new https.Agent({ rejectUnauthorized: false });
 
 const key = process.env.GEMINI_API_KEY || '';
 console.log('Key prefix:', key.substring(0, 8) + '...');
@@ -15,7 +17,7 @@ async function test() {
       const r = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
         body,
-        { headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, timeout: 10000 }
+        { headers: { 'x-goog-api-key': key, 'Content-Type': 'application/json' }, timeout: 10000, httpsAgent: agent }
       );
       const text = r.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       console.log(`✅ SUCCESS model=${model} header=x-goog-api-key → "${text}"`);
@@ -29,7 +31,7 @@ async function test() {
       const r = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`,
         body,
-        { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+        { headers: { 'Content-Type': 'application/json' }, timeout: 10000, httpsAgent: agent }
       );
       const text = r.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       console.log(`✅ SUCCESS model=${model} header=?key= → "${text}"`);

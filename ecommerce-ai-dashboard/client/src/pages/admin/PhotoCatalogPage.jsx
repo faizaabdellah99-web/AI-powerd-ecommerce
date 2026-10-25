@@ -89,13 +89,25 @@ export default function PhotoCatalogPage() {
     setLoading(true);
     
     try {
-      // Detect category from first image filename
-      const firstImageName = images[0]?.name || '';
-      const filenameCategory = detectCategoryFromFilename(firstImageName);
-      setDetectedCategory(filenameCategory || 'Electronics');
-
-      // Fetch actual products from database based on detected category
-      const categoryParam = filenameCategory || 'Electronics';
+      // Step 1: Send image to AI Vision API for analysis
+      const formData = new FormData();
+      formData.append('image', images[0]);
+      
+      console.log('🔍 Sending image to AI Vision API...');
+      const { data: visionData } = await api.post('/ai/analyze-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      
+      console.log('📦 AI Vision response:', visionData);
+      
+      // Step 2: Use AI-detected category and product name
+      const aiCategory = visionData.category || visionData.detected_category;
+      const aiProductName = visionData.product_name || visionData.name || visionData.top_label;
+      
+      setDetectedCategory(aiCategory || 'Electronics');
+      
+      // Step 3: Fetch products from database based on AI-detected category
+      const categoryParam = aiCategory || 'Electronics';
       const { data: productsData } = await api.get(`/products?category=${encodeURIComponent(categoryParam)}&limit=50`);
       
       const products = productsData.products || [];
@@ -105,14 +117,14 @@ export default function PhotoCatalogPage() {
         const productCatalog = products.map(product => ({
           name: product.name,
           itemCount: product.stock || 0,
-          categories: [product.category, filenameCategory || 'General'],
+          categories: [product.category, aiCategory || 'General'],
           price: product.price,
           productId: product._id,
           image: product.image,
         }));
         
         setCatalogResults(productCatalog);
-        toast.success(`Found ${products.length} ${categoryParam} products in database!`);
+        toast.success(`AI detected: ${aiProductName || aiCategory}. Found ${products.length} products!`);
       } else {
         // Fallback to demo catalogs if no products found
         const demoCatalogs = {
@@ -140,11 +152,11 @@ export default function PhotoCatalogPage() {
         };
         
         setCatalogResults(demoCatalogs[categoryParam] || demoCatalogs['Electronics']);
-        toast.info(`No ${categoryParam} products found. Showing demo catalog.`);
+        toast.info(`AI detected: ${aiProductName || aiCategory}. No database products found. Showing demo catalog.`);
       }
     } catch (err) {
       console.error('Catalog generation error:', err);
-      toast.error('Failed to generate catalog. Please try again.');
+      toast.error('Failed to analyze image. Using filename fallback.');
       
       // Fallback: detect category from filenames and show demo
       const firstImageCategory = detectCategoryFromFilename(images[0]?.name || '');
@@ -174,7 +186,7 @@ export default function PhotoCatalogPage() {
       
       setDetectedCategory(firstImageCategory || 'Electronics');
       setCatalogResults(demoCatalogs[firstImageCategory] || demoCatalogs['Electronics']);
-      toast.info(`Showing demo ${firstImageCategory || 'Electronics'} catalog.`);
+      toast.info(`Using filename fallback: ${firstImageCategory || 'Electronics'}`);
     } finally {
       setLoading(false);
     }

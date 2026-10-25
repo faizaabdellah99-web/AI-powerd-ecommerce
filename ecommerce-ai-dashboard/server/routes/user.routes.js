@@ -7,9 +7,102 @@ const Order = require('../models/Order.model');
 // ── GET all users (admin) ──────────────────────────────────────────────────────
 router.get('/', protect, authorize('admin'), async (req, res) => {
   try {
-    const users = await User.find().select('-password');
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
     res.json(users);
   } catch (e) { res.status(500).json({ message: e.message }); }
+});
+
+// ── POST create new Admin (admin only) ─────────────────────────────────────────
+router.post('/admin', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password are required' });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    const emailNorm = email.toLowerCase().trim();
+    const existing = await User.findOne({ email: emailNorm });
+    if (existing) {
+      return res.status(400).json({ message: 'A user with this email already exists' });
+    }
+
+    const adminName = (name && name.trim()) ? name.trim() : emailNorm.split('@')[0];
+
+    const newAdmin = await User.create({
+      name: adminName,
+      email: emailNorm,
+      password: password,
+      role: 'admin',
+    });
+
+    const sanitized = newAdmin.toObject();
+    delete sanitized.password;
+
+    res.status(201).json({
+      message: 'New Admin created successfully',
+      user: sanitized,
+    });
+  } catch (e) {
+    console.error('Error creating admin:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── POST create new Vendor (admin only) ─────────────────────────────────────────
+router.post('/vendor', protect, authorize('admin'), async (req, res) => {
+  try {
+    const { storeName, name, email, password } = req.body;
+    if (!storeName || !name || !email || !password) {
+      return res.status(400).json({
+        message: 'Store name, owner name, email, and temporary password are required',
+      });
+    }
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Temporary password must be at least 6 characters' });
+    }
+
+    const emailNorm = email.toLowerCase().trim();
+    const existing = await User.findOne({ email: emailNorm });
+    if (existing) {
+      return res.status(400).json({ message: 'A user with this email already exists' });
+    }
+
+    const newVendor = await User.create({
+      storeName: storeName.trim(),
+      name: name.trim(),
+      email: emailNorm,
+      password: password,
+      role: 'vendor',
+    });
+
+    const sanitized = newVendor.toObject();
+    delete sanitized.password;
+
+    res.status(201).json({
+      message: 'New Vendor created successfully',
+      user: sanitized,
+    });
+  } catch (e) {
+    console.error('Error creating vendor:', e);
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// ── DELETE user (admin only) ──────────────────────────────────────────────────
+router.delete('/:id', protect, authorize('admin'), async (req, res) => {
+  try {
+    if (req.user._id.toString() === req.params.id) {
+      return res.status(400).json({ message: 'You cannot delete your own admin account' });
+    }
+    const user = await User.findByIdAndDelete(req.params.id);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    res.json({ message: 'User removed successfully' });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 });
 
 // ── GET all customers with real order stats ────────────────────────────────────

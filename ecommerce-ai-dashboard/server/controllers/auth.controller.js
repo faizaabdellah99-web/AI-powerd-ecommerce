@@ -43,29 +43,19 @@ exports.register = async (req, res) => {
   if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
   try {
-    const { name, email, password, role, vendorCode } = req.body;
+    const { name, email, password } = req.body;
 
-    // ── Role security ────────────────────────────────────────────────────────
-    if (role === 'admin') {
-      const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE || 'ADMIN2025';
-      if (!vendorCode || vendorCode.trim() !== ADMIN_INVITE_CODE) {
-        return res.status(403).json({ message: `Invalid admin invite code. Use code: ADMIN2025` });
-      }
-    }
-
-    const VENDOR_INVITE_CODE = process.env.VENDOR_INVITE_CODE || 'VENDOR2025';
-    if (role === 'vendor') {
-      if (!vendorCode || vendorCode.trim() !== VENDOR_INVITE_CODE) {
-        return res.status(403).json({ message: `Invalid vendor invite code. Use code: VENDOR2025` });
-      }
-    }
-
-    const allowedRole = ['customer', 'vendor', 'admin'].includes(role) ? role : 'customer';
-
-    const exists = await User.findOne({ email });
+    // Public registration is restricted to CUSTOMERS only!
+    // Admins and Vendors must be registered by an existing Admin in the Admin Dashboard.
+    const exists = await User.findOne({ email: email.toLowerCase().trim() });
     if (exists) return res.status(400).json({ message: 'Email already registered' });
 
-    const user  = await User.create({ name, email, password, role: allowedRole });
+    const user  = await User.create({
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password,
+      role: 'customer',
+    });
     const token = signToken(user._id);
 
     // Enrich with segment data for customers

@@ -1,6 +1,5 @@
 import Sidebar from './Sidebar';
 import AIChatAssistant from './AIChatAssistant';
-import NotificationBell from './NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
@@ -61,7 +60,7 @@ export default function Layout({ children, title, subtitle }) {
             {subtitle && <p  style={{ fontSize: 12, color: 'var(--text3)', margin: '2px 0 0' }}>{subtitle}</p>}
           </div>
 
-          {/* Right side: theme toggle and notification bell */}
+          {/* Right side: theme toggle */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <button
               onClick={toggleTheme}
@@ -85,7 +84,6 @@ export default function Layout({ children, title, subtitle }) {
                 {theme === 'dark' ? 'Light' : 'Dark'}
               </span>
             </button>
-            <NotificationBell />
           </div>
         </div>
 

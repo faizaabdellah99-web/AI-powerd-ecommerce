@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Layout from '../../components/shared/Layout';
 import StatCard from '../../components/shared/StatCard';
 import Card from '../../components/shared/Card';
@@ -6,6 +6,7 @@ import api from '../../services/api';
 import toast from 'react-hot-toast';
 import { useOrderSocket } from '../../hooks/useSocket';
 import { useNavigate } from 'react-router-dom';
+
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell,
@@ -256,7 +257,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
         {[
           { icon:'📊', title:'Segments', desc:'Customer, Product & Sales segments', path:'/admin/segments', color:'#6366f1' },
           { icon:'📦', title:'Inventory', desc:'Stock levels & expiry tracking', path:'/admin/inventory', color:'#10b981' },
-          { icon:'👥', title:'Customer Analysis', desc:'Individual customer analysis', path:'/admin/customer-segments', color:'#f59e0b' },
+          { icon:'💰', title:'Smart Pricing', desc:'Dynamic pricing & competitor AI', path:'/admin/pricing', color:'#f59e0b' },
           { icon:'📈', title:'Demand Forecast', desc:'AI-powered sales predictions', path:'/admin/demand', color:'#8b5cf6' },
         ].map(item => (
           <div key={item.path} onClick={()=>navigate(item.path)} style={{
@@ -792,6 +793,7 @@ Give a 2-sentence summary with numbers. Be specific.`,
           )}
         </Card>
       </div>
+
     </Layout>
   );
 }

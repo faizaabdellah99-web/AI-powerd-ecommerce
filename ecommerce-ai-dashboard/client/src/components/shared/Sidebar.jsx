@@ -11,11 +11,19 @@ const adminNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/demand',       icon: '📈', label: 'Demand Forecast' },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
+  {
+    path: '/admin/product-ai',   icon: '🤖', label: 'Product AI',
+    subItems: [
+      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
+      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
+      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
+    ],
+  },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/segments',     icon: '📊', label: 'Segments'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
   { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },
+  { path: '/admin/users',        icon: '👥', label: 'User Management' },
 ];
 
 const vendorNav = [
@@ -24,7 +32,14 @@ const vendorNav = [
   { path: '/admin/inventory',    icon: '📦', label: 'Inventory'       },
   { path: '/admin/expiry',       icon: '⏰', label: 'Expiry Tracker'  },
   { path: '/admin/pricing',      icon: '💰', label: 'Smart Pricing'   },
-  { path: '/admin/product-ai',   icon: '🤖', label: 'Product AI'      },
+  {
+    path: '/admin/product-ai',   icon: '🤖', label: 'Product AI',
+    subItems: [
+      { path: '/admin/product-ai?tab=description', icon: '✍️', label: 'Description Generator' },
+      { path: '/admin/product-ai?tab=vision',      icon: '📷', label: 'Photo Cataloging'       },
+      { path: '/admin/product-ai?tab=image',       icon: '🖼️', label: 'Image Search'           },
+    ],
+  },
   { path: '/admin/products',     icon: '🏷️', label: 'Products'        },
   { path: '/admin/feedback',     icon: '💬', label: 'Feedback'        },
   { path: '/admin/ai-chat',      icon: '⚡',  label: 'AI Chat'         },
@@ -54,11 +69,8 @@ export default function Sidebar() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const { newOrderCount, recentOrders, topCustomers, setTopCustomers } = useOrderStore();
-  const [showOrderPanel, setShowOrderPanel] = useState(false);
-  const [showCustomerPanel, setShowCustomerPanel] = useState(false);
+  const { newOrderCount } = useOrderStore();
   const [expandedMenus, setExpandedMenus] = useState({});
-  const [orderStats, setOrderStats] = useState({ pending: 0, today: 0, total: 0, totalRevenue: 0 });
   const [feedbackUnread, setFeedbackUnread] = useState(0); // admin: new feedback count
   const [replyUnread, setReplyUnread] = useState(0);       // customer: unread admin replies
 
@@ -144,46 +156,6 @@ export default function Sidebar() {
     s.on('new-order', handler);
     return () => { s.off('new-order', handler); };
   }, []);
-
-  // Fetch order stats and top customers (admin/vendor only)
-  useEffect(() => {
-    if (user?.role === 'customer') return;
-    const fetchData = async () => {
-      try {
-        const { data: stats } = await api.get('/orders/stats');
-        setOrderStats({
-          pending: stats.pendingOrders || 0,
-          today: stats.todayRevenue || 0,
-          total: stats.totalOrders || 0,
-          totalRevenue: stats.totalRevenue || 0,
-        });
-      } catch {
-        setOrderStats({ pending: 3, today: 1250, total: 156, totalRevenue: 125000 });
-      }
-
-      try {
-        const { data } = await api.get('/orders?limit=100');
-        const orders = data.orders || data || [];
-        // Aggregate top customers by total spent
-        const customerMap = {};
-        orders.forEach(o => {
-          if (!o.customer?.name) return;
-          const key = o.customer._id || o.customer.email || o.customer.name;
-          if (!customerMap[key]) {
-            customerMap[key] = { name: o.customer.name, email: o.customer.email || '', totalSpent: 0, orders: 0, avatar: o.customer.name[0] };
-          }
-          customerMap[key].totalSpent += o.total || 0;
-          customerMap[key].orders += 1;
-        });
-        const sorted = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
-        if (sorted.length > 0) setTopCustomers(sorted);
-        else setTopCustomers(DEMO_TOP_CUSTOMERS);
-      } catch {
-        setTopCustomers(DEMO_TOP_CUSTOMERS);
-      }
-    };
-    fetchData();
-  }, [setTopCustomers, user?.role]);
 
   const nav = user?.role === 'vendor' ? vendorNav : ['admin'].includes(user?.role) ? adminNav : customerNav;
   const roleLabel = user?.role === 'vendor' ? 'Vendor' : user?.role === 'admin' ? 'Admin' : 'Customer';
@@ -301,118 +273,6 @@ export default function Sidebar() {
             </div>
           );
         })}
-
-        {/* ── Order Stats Panel (Admin/Vendor only) ── */}
-        {user?.role !== 'customer' && (
-          <div style={{ marginTop: 16, padding: '0 4px' }}>
-            <div
-              onClick={() => setShowOrderPanel(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                color: 'var(--text3)', background: showOrderPanel ? 'var(--bg3)' : 'transparent',
-              }}
-            >
-              <span>📊</span>
-              <span style={{ flex: 1 }}>Order Overview</span>
-              <span style={{ fontSize: 10 }}>{showOrderPanel ? '▲' : '▼'}</span>
-            </div>
-
-            {showOrderPanel && (
-              <div style={{ padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8, marginTop: 4 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-                  <span>⏳ Pending</span>
-                  <span style={{ fontWeight: 700, color: '#eab308' }}>{orderStats.pending}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-                  <span>💰 Today</span>
-                  <span style={{ fontWeight: 700, color: '#10b981' }}>${orderStats.today.toFixed(2)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text3)', marginBottom: 6 }}>
-                  <span>💵 Total Revenue</span>
-                  <span style={{ fontWeight: 700, color: '#6366f1' }}>${(orderStats.totalRevenue || 0).toLocaleString()}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: 'var(--text3)' }}>
-                  <span>📋 Total Orders</span>
-                  <span style={{ fontWeight: 700, color: 'var(--primary)' }}>{orderStats.total}</span>
-                </div>
-
-                {/* Recent orders ticker */}
-                {recentOrders.length > 0 && (
-                  <div style={{ marginTop: 8, borderTop: '1px solid var(--border)', paddingTop: 8 }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--text3)', marginBottom: 6, letterSpacing: 0.5 }}>
-                      🔔 RECENT ORDERS
-                    </div>
-                    {recentOrders.slice(0, 3).map((o, i) => (
-                      <div key={i} style={{ fontSize: 10, color: 'var(--text2)', marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-                        <span>{o.orderId || `#${i + 1}`}</span>
-                        <span style={{ fontWeight: 600, color: '#10b981' }}>${Number(o.total || 0).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Top Customers Panel (Admin/Vendor only) ── */}
-        {user?.role !== 'customer' && (
-          <div style={{ marginTop: 8, padding: '0 4px' }}>
-            <div
-              onClick={() => setShowCustomerPanel(v => !v)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px',
-                borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 600,
-                color: 'var(--text3)', background: showCustomerPanel ? 'var(--bg3)' : 'transparent',
-              }}
-            >
-              <span>👑</span>
-              <span style={{ flex: 1 }}>Top Customers</span>
-              <span style={{ fontSize: 10 }}>{showCustomerPanel ? '▲' : '▼'}</span>
-            </div>
-
-            {showCustomerPanel && (
-              <div style={{ padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8, marginTop: 4 }}>
-                {topCustomers.length === 0 ? (
-                  <div style={{ fontSize: 11, color: 'var(--text3)', textAlign: 'center', padding: 8 }}>
-                    No customer data yet
-                  </div>
-                ) : (
-                  topCustomers.map((c, i) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      padding: '6px 0', borderBottom: i < topCustomers.length - 1 ? '1px solid var(--border)' : 'none',
-                    }}>
-                      <div style={{
-                        width: 24, height: 24, borderRadius: '50%',
-                        background: ['#6366f1', '#10b981', '#f59e0b', '#8b5cf6', '#3b82f6'][i],
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0,
-                      }}>
-                        {c.avatar || c.name?.[0] || '?'}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {c.name}
-                        </div>
-                        <div style={{ fontSize: 9, color: 'var(--text3)' }}>
-                          {c.orders} orders · ${(c.totalSpent || 0).toLocaleString()}
-                        </div>
-                      </div>
-                      <div style={{
-                        fontSize: 9, fontWeight: 700, color: '#10b981',
-                        background: '#10b98115', padding: '2px 6px', borderRadius: 10,
-                      }}>
-                        #{i + 1}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
       </nav>
 
       {/* User */}

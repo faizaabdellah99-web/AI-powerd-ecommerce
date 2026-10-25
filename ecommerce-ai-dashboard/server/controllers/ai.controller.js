@@ -82,6 +82,14 @@ async function geminiChat(history, message, systemContext) {
 // ── Gemini Vision helper — supports images + model/header fallback ───────────
 async function callGeminiVision(imageBase64, mimeType, prompt) {
   const key = getKey();
+  
+  if (!key || key === 'your_gemini_api_key_here') {
+    console.error('❌ Gemini API key is not configured. Please set GEMINI_API_KEY in .env file.');
+    throw new Error('Gemini API key not configured');
+  }
+  
+  console.log('🔑 Using Gemini API key:', key.substring(0, 10) + '...');
+  
   const headersList = [
     { 'x-goog-api-key': key, 'Content-Type': 'application/json' },
     { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -98,15 +106,22 @@ async function callGeminiVision(imageBase64, mimeType, prompt) {
       generationConfig: { maxOutputTokens: 2048, temperature: 0.2 },
     };
 
+    console.log(`🌐 Trying model: ${model}`);
+
     for (const h of headersList) {
       try {
         const resp = await axios.post(url, body, { headers: h, timeout: 45000 });
         const text = resp.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (text) return text;
+        if (text) {
+          console.log('✅ Gemini Vision success');
+          return text;
+        }
       } catch (e) {
         lastErr = e;
         const status = e.response?.status;
         const msg = (e.response?.data?.error?.message || '').toLowerCase();
+        console.error(`❌ Gemini Vision error for ${model}:`, status, msg);
+        
         if (status !== 429 && !msg.includes('quota') && !msg.includes('unsupported') && !msg.includes('image')) {
           if (status === 401 || status === 403) break; // wrong auth header, try next
           throw e; // hard error — don't retry (outside quota)
@@ -451,6 +466,12 @@ const analyzeProductImage = async (req, res) => {
     const imageBase64 = req.file.buffer.toString('base64');
     const mimeType    = req.file.mimetype || 'image/jpeg';
 
+    console.log('📸 Analyzing product image:', { 
+      originalName: req.file.originalname, 
+      mimeType, 
+      size: req.file.buffer.length 
+    });
+
     const prompt = `You are an expert e-commerce product cataloging AI. Examine this image carefully and provide an accurate, high-quality product description.
 
 CRITICAL INSTRUCTIONS:
@@ -478,13 +499,16 @@ Return ONLY raw JSON (no markdown, no code fences):
   "confidence": "high|medium"
 }`;
 
+    console.log('🤖 Calling Gemini Vision API...');
     const text  = await callGeminiVision(imageBase64, mimeType, prompt);
+    console.log('✅ Gemini Vision response received');
 
     const clean = text.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim();
     const match = clean.match(/\{[\s\S]*\}/);
     if (!match) throw new Error('Could not parse vision response');
 
     const parsed = JSON.parse(match[0]);
+    console.log('📦 Parsed AI response:', { product_name: parsed.product_name, category: parsed.category });
 
     // Validate / normalize category to one of the 10 known values
     const VALID_CATS = ['Electronics','Clothing','Home & Garden','Food & Beverage',
@@ -513,10 +537,13 @@ Return ONLY raw JSON (no markdown, no code fences):
       parsed.category = 'General Merchandise';
     }
 
+    console.log('✅ Final AI result:', { product_name: parsed.product_name, category: parsed.category });
     res.json(parsed);
 
   } catch (error) {
-    console.error('Vision Analysis Error:', error.message);
+    console.error('❌ Vision Analysis Error:', error.message);
+    console.log('🔄 Falling back to filename-based detection...');
+    
     // Intelligent fallback: extract filename & generate realistic product data
     const crypto = require('crypto');
     const path   = require('path');
@@ -528,7 +555,27 @@ Return ONLY raw JSON (no markdown, no code fences):
       .replace(/[-_]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const productName = cleanName || `Product ${crypto.createHash('md5').update(req.file.buffer).digest('hex').slice(0, 8)}`;
+    
+    console.log('📂 Filename fallback - Original:', originalName);
+    console.log('📂 Filename fallback - Clean:', cleanName);
+    
+    // Try to extract product name from filename by removing common junk words
+    const junkWords = ['img', 'photo', 'image', 'pic', 'picture', 'screenshot', 'capture', 'download', 'whatsapp', 'camera', 'mobile', 'phone', 'file', 'upload', 'jpg', 'jpeg', 'png', 'webp'];
+    let productName = cleanName;
+    junkWords.forEach(word => {
+      const regex = new RegExp(`\\b${word}\\b`, 'gi');
+      productName = productName.replace(regex, '').trim();
+    });
+    
+    // Capitalize product name properly
+    productName = productName.replace(/\b\w/g, c => c.toUpperCase());
+    
+    console.log('📂 Filename fallback - Extracted product name:', productName);
+    
+    if (!productName || productName.length < 3) {
+      productName = `Product ${crypto.createHash('md5').update(req.file.buffer).digest('hex').slice(0, 8)}`;
+      console.log('📂 Filename fallback - Using fallback name:', productName);
+    }
 
     // Smart category detection based on filename keywords
     // Uses scoring so the BEST matching category wins (not just first keyword hit),
@@ -537,7 +584,7 @@ Return ONLY raw JSON (no markdown, no code fences):
       'Electronics':   ['phone','laptop','headphone','charger','cable','speaker','camera','tv','monitor','keyboard','mouse','tablet','watch','earphone','earbud','airpod','computer','screen','battery','adapter','usb','hdmi','drone','printer','scanner','router','modem','hard drive','ssd','memory','ram','processor','cpu','gpu','fan','cooler','light','bulb','smartwatch','power bank','usb cable','charging'],
       'Clothing':      ['shirt','dress','pants','jacket','coat','shoe','sneaker','hat','cap','sock','belt','bag','jewelry','ring','necklace','scarf','glove','hoodie','sweater','jean','short','trouser','blouse','skirt','suit','tie','wallet','backpack','purse','apparel','fashion','wearable','tshirt','t-shirt','jogger','legging','sandal','boot','footwear','attire','clothes','cloth','outfit','garment','wear','fashion','style','heel','flat','loafer','slipper','flip flop','wedding','formal','casual','sportswear','activewear','underwear','bra','panty','boxer','brief','lingerie','nightwear','robe','kimono','cardigan','blazer','vest','tank top','crop top','pullover','cardigan','sweatshirt','polo','jersey','uniform','costume','mask','accessory'],
       'Home & Garden': ['chair','table','lamp','sofa','couch','bed','pillow','towel','pot','plant','vase','frame','mirror','rug','curtain','shelf','cabinet','drawer','mat','basket','mug','cup','plate','bowl','candle','decoration','garden','flower','soil','tool','furniture','cushion','blanket','kitchen','cookware','pan','utensil','mattress','closet'],
-      'Beauty & Care': ['cream','lotion','soap','shampoo','perfume','makeup','lipstick','brush','comb','oil','mask','serum','spray','deodorant','moisturizer','sunscreen','nail','polish','face','body','hair','skin','cosmetic','fragrance','skincare','cleanser','toner','eyeliner','mascara','foundation','conditioner'],
+      'Beauty & Care': ['cream','lotion','soap','shampoo','perfume','makeup','lipstick','brush','comb','oil','mask','serum','spray','deodorant','moisturizer','sunscreen','nail','polish','face','body','hair','skin','cosmetic','fragrance','skincare','cleanser','toner','eyeliner','mascara','foundation','conditioner','beauty','care','faiza','gel','scrub','wash','powder','balm','wax','tint','glow','radiance','rejuvenate','hydrate','exfoliate','anti-aging','antiaging','whitening','brightening','clearing','acne','blemish','pore','lines','wrinkle','aging','spf','uv','sun','protection','moisture','hydrating','nourishing','revitalizing','refreshing','soothing','calming','healing','repair','restore','renew','recharge','energize','vitalize','revive','refresh','glow','shine','sparkle','luminous','radiant','healthy','pure','natural','organic','herbal','botanical','plant-based','vegan','cruelty-free','dermatologist','tested','approved','safe','gentle','mild','sensitive','all-skin','oily','dry','combination','normal','mature','young','teen','adult','men','women','unisex'],
       'Sports & Fitness': ['ball','dumbbell','yoga','mat','bike','helmet','racket','glove','strap','bottle','shorts','kettlebell','jump rope','resistance','band','gym','fitness','sport','exercise','training','weight','treadmill','skate','board','basketball','football','soccer','tennis','badminton','barbell','pull up','gym equipment','dumbbells'],
       'Food & Beverage': ['bottle','can','jar','snack','drink','tea','coffee','water','juice','chocolate','cookie','candy','chips','sauce','spice','oil','vinegar','honey','jam','bread','pasta','rice','cereal','protein','bar','supplement','food','beverage','soda','milk','cheese','yogurt','fruit','vegetable','seasoning'],
       'Books':         ['book','journal','notebook','magazine','guide','manual','novel','textbook','planner','diary','cookbook','workbook','bible','quran','comic','manga','reading','paperback','hardcover'],
@@ -550,50 +597,68 @@ Return ONLY raw JSON (no markdown, no code fences):
     let detectedCategory = null;
     let bestScore = 0;
     const nameLower = cleanName.toLowerCase();
+    
+    console.log('🔍 Category detection - Name lower:', nameLower);
+    
     for (const [cat, keywords] of Object.entries(categoryKeywords)) {
       let score = 0;
       for (const kw of keywords) {
         if (nameLower.includes(kw)) {
           // Longer keywords are more specific → weight them higher
           score += 1 + (kw.length >= 5 ? 2 : 0);
+          console.log(`  ✅ Match found: "${kw}" for category "${cat}" (score: ${score})`);
         }
       }
       if (score > bestScore) {
         bestScore = score;
         detectedCategory = cat;
+        console.log(`  🏆 New best category: "${cat}" with score ${bestScore}`);
       }
     }
+    
+    console.log(`🏁 Final detected category: "${detectedCategory}" with score ${bestScore}`);
 
     // Special case: if filename contains shoe-related words but didn't score high, force Clothing
     const shoeKeywords = ['shoe','sneaker','boot','sandal','heel','footwear','loafer','slipper','flip','flop','trainer','running','walking'];
     if (shoeKeywords.some(kw => nameLower.includes(kw))) {
+      console.log('👟 Shoe keyword detected, forcing Clothing category');
       detectedCategory = 'Clothing';
       bestScore = 10; // Force high score
     }
 
     // No keyword matched → use a generic "General" category instead of always Electronics
-    if (!detectedCategory) detectedCategory = 'General Merchandise';
+    if (!detectedCategory) {
+      console.log('⚠️ No category matched, using General Merchandise');
+      detectedCategory = 'General Merchandise';
+    }
+    
     // Check if filename is a generic/junk name (screenshot, img, photo, etc.)
     const junkPattern = /^(img[_ -]?|photo|image|download|screenshot|whatsapp|camera|mobile|phone|frame|picture|pic|file|capture)/i;
     const isJunkName = junkPattern.test(cleanName) || /^\d+$/.test(cleanName);
+    
+    console.log('🔍 Junk name check:', { isJunkName, cleanName });
 
-    let finalProductName = cleanName;
+    let finalProductName = productName;
     if (isJunkName) {
       // Don't show "Screenshot" as the product name! Use a clean placeholder or category-based name
       if (detectedCategory && detectedCategory !== 'General Merchandise') {
         finalProductName = `${detectedCategory} Item`;
+        console.log('🏷️ Using category-based name:', finalProductName);
       } else {
         finalProductName = 'Uploaded Product';
+        console.log('🏷️ Using generic name:', finalProductName);
       }
+    } else {
+      console.log('🏷️ Using extracted filename as product name:', finalProductName);
     }
 
     // Category-specific realistic templates
     const templates = {
       'General Merchandise': {
         tags: ['product', 'merchandise', 'general', 'retail', 'item'],
-        short_description: `The ${productName} is a quality general merchandise item suitable for everyday use.`,
+        short_description: `The ${finalProductName} is a quality general merchandise item suitable for everyday use.`,
         bullet_points: [
-          `${productName} — practical and well-made for daily use`,
+          `${finalProductName} — practical and well-made for daily use`,
           'Durable construction — built to last through regular handling',
           'Versatile design — fits a wide range of everyday uses',
           'Easy to clean and maintain — minimal upkeep required',
@@ -603,9 +668,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Electronics': {
         tags: ['electronic', 'gadget', 'tech', detectedCategory.toLowerCase(), 'device'],
-        short_description: `The ${productName} is a high-quality electronic device designed for reliable everyday performance.`,
+        short_description: `The ${finalProductName} is a high-quality electronic device designed for reliable everyday performance.`,
         bullet_points: [
-          `${productName} — built with durable materials for long-lasting use`,
+          `${finalProductName} — built with durable materials for long-lasting use`,
           'Connects via standard ports — USB, HDMI, or wireless',
           'Compact and portable design — fits easily on any desk or bag',
           'Energy-efficient — low power consumption for eco-friendly operation',
@@ -615,9 +680,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Clothing': {
         tags: ['fashion', 'clothing', 'wearable', detectedCategory.toLowerCase(), 'apparel', 'shoe', 'dress', 'footwear', 'attire'],
-        short_description: `The ${productName} is a stylish and comfortable clothing piece for everyday wear.`,
+        short_description: `The ${finalProductName} is a stylish and comfortable clothing piece for everyday wear.`,
         bullet_points: [
-          `${productName} — made from soft, breathable fabric for all-day comfort`,
+          `${finalProductName} — made from soft, breathable fabric for all-day comfort`,
           'Available in multiple sizes — find your perfect fit',
           'Machine washable — easy care for daily use',
           'Modern design that pairs well with any outfit',
@@ -627,9 +692,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Home & Garden': {
         tags: ['home', 'garden', 'decor', detectedCategory.toLowerCase(), 'furniture'],
-        short_description: `The ${productName} is a practical and stylish addition to any home or garden.`,
+        short_description: `The ${finalProductName} is a practical and stylish addition to any home or garden.`,
         bullet_points: [
-          `${productName} — crafted from quality materials for lasting beauty`,
+          `${finalProductName} — crafted from quality materials for lasting beauty`,
           'Easy to clean and maintain — wipe with a damp cloth',
           'Versatile design that complements any decor style',
           'Sturdy construction — built for daily use',
@@ -639,9 +704,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Beauty & Care': {
         tags: ['beauty', 'care', 'personal care', detectedCategory.toLowerCase(), 'cosmetic'],
-        short_description: `The ${productName} is a premium beauty and personal care product for daily routines.`,
+        short_description: `The ${finalProductName} is a premium beauty and personal care product for daily routines.`,
         bullet_points: [
-          `${productName} — formulated with gentle, skin-friendly ingredients`,
+          `${finalProductName} — formulated with gentle, skin-friendly ingredients`,
           'Easy to apply — smooth texture for even coverage',
           'Long-lasting results — stays effective throughout the day',
           'Suitable for all skin types — dermatologist tested',
@@ -651,9 +716,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Sports & Fitness': {
         tags: ['sports', 'fitness', 'exercise', detectedCategory.toLowerCase(), 'active'],
-        short_description: `The ${productName} is designed for active lifestyles and fitness enthusiasts.`,
+        short_description: `The ${finalProductName} is designed for active lifestyles and fitness enthusiasts.`,
         bullet_points: [
-          `${productName} — built for performance and durability`,
+          `${finalProductName} — built for performance and durability`,
           'Lightweight construction — easy to carry to the gym or outdoors',
           'Ergonomic design — comfortable during extended use',
           'Weather-resistant — suitable for indoor and outdoor activities',
@@ -663,9 +728,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Food & Beverage': {
         tags: ['food', 'beverage', 'kitchen', detectedCategory.toLowerCase(), 'grocery'],
-        short_description: `The ${productName} is a quality food or beverage product for everyday enjoyment.`,
+        short_description: `The ${finalProductName} is a quality food or beverage product for everyday enjoyment.`,
         bullet_points: [
-          `${productName} — carefully prepared for consistent quality and taste`,
+          `${finalProductName} — carefully prepared for consistent quality and taste`,
           'Fresh packaging — sealed to preserve flavor and nutrients',
           'Convenient for on-the-go or home use',
           'Versatile — great on its own or as part of a recipe',
@@ -675,9 +740,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Books': {
         tags: ['book', 'reading', 'knowledge', detectedCategory.toLowerCase(), 'education'],
-        short_description: `The ${productName} is an engaging and informative read for all audiences.`,
+        short_description: `The ${finalProductName} is an engaging and informative read for all audiences.`,
         bullet_points: [
-          `${productName} — clear and well-organized content for easy reading`,
+          `${finalProductName} — clear and well-organized content for easy reading`,
           'Perfect for both beginners and experienced readers',
           'High-quality printing on durable paper',
           'Beautiful cover design — looks great on any shelf',
@@ -687,9 +752,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Toys': {
         tags: ['toy', 'game', 'fun', detectedCategory.toLowerCase(), 'play'],
-        short_description: `The ${productName} is a fun and safe toy for hours of creative play.`,
+        short_description: `The ${finalProductName} is a fun and safe toy for hours of creative play.`,
         bullet_points: [
-          `${productName} — made from child-safe, non-toxic materials`,
+          `${finalProductName} — made from child-safe, non-toxic materials`,
           'Encourages imagination and creative thinking',
           'Bright and colorful design — captures children\'s attention',
           'Durable construction — withstands active play',
@@ -699,9 +764,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Automotive': {
         tags: ['automotive', 'car', 'vehicle', detectedCategory.toLowerCase(), 'accessory'],
-        short_description: `The ${productName} is a reliable automotive accessory for your vehicle.`,
+        short_description: `The ${finalProductName} is a reliable automotive accessory for your vehicle.`,
         bullet_points: [
-          `${productName} — built to meet OEM quality and safety standards`,
+          `${finalProductName} — built to meet OEM quality and safety standards`,
           'Easy to install with basic tools — includes mounting hardware',
           'Durable construction — resistant to weather and wear',
           'Compatible with most standard vehicle models',
@@ -711,9 +776,9 @@ Return ONLY raw JSON (no markdown, no code fences):
       },
       'Health': {
         tags: ['health', 'wellness', 'medical', detectedCategory.toLowerCase(), 'safety'],
-        short_description: `The ${productName} is a health and wellness product for everyday safety and care.`,
+        short_description: `The ${finalProductName} is a health and wellness product for everyday safety and care.`,
         bullet_points: [
-          `${productName} — made from safe, high-quality medical-grade materials`,
+          `${finalProductName} — made from safe, high-quality medical-grade materials`,
           'Easy to use — no special training required',
           'Sterile and hygienic packaging for safety',
           'Compact and easy to store in any first-aid kit',
@@ -725,16 +790,20 @@ Return ONLY raw JSON (no markdown, no code fences):
 
     const template = templates[detectedCategory] || templates['Electronics'];
 
-    res.json({
+    const result = {
       product_name: finalProductName,
       category: detectedCategory,
       tags: [finalProductName.toLowerCase(), detectedCategory.toLowerCase(), 'product', 'catalog', 'item'],
-      short_description: template.short_description.replace(productName, finalProductName),
-      long_description: `${template.short_description.replace(productName, finalProductName)} This ${detectedCategory.toLowerCase()} item was detected from your uploaded photo. You can edit the product name and category above before generating the full description.`,
-      bullet_points: template.bullet_points.map(b => b.replace(productName, finalProductName)),
+      short_description: template.short_description,
+      long_description: `${template.short_description} This ${detectedCategory.toLowerCase()} item was detected from your uploaded photo. You can edit the product name and category above before generating the full description.`,
+      bullet_points: template.bullet_points,
       suggested_price_range: template.price,
       confidence: isJunkName ? 'medium' : 'high',
-    });
+    };
+    
+    console.log('✅ Fallback result:', { product_name: result.product_name, category: result.category, confidence: result.confidence });
+    
+    res.json(result);
   }
 };
 

@@ -140,6 +140,8 @@ export default function ProductAIPage() {
     if (!prod) return;
     const featureParts = [
       prod.brand           ? `Brand: ${prod.brand}`           : null,
+      prod.description     ? `Details: ${prod.description}`   : null,
+      prod.price != null   ? `Price: $${prod.price}`          : null,
       prod.stock != null   ? `Stock: ${prod.stock} units`     : null,
       prod.warranty        ? `Warranty: ${prod.warranty}`     : null,
       prod.ratings?.average? `Rating: ${prod.ratings.average}/5` : null,
@@ -356,6 +358,21 @@ export default function ProductAIPage() {
                   <div style={{ fontSize:11, color:'var(--text3)' }}>Select a product or type a name below</div>
                 </div>
               </div>
+
+              <Field label="Select Existing Product (Optional)">
+                <select
+                  value={selectedPid}
+                  onChange={e => selectProduct(e.target.value)}
+                  style={{ width: '100%', padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg2)', color: 'var(--text)', fontSize: 13, marginBottom: 12 }}
+                >
+                  <option value="">— Or choose from catalog —</option>
+                  {products.map(p => (
+                    <option key={p._id} value={p._id}>
+                      {p.name} {p.category ? `(${p.category})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </Field>
 
               <Field label="Product Name *">
                 <input
