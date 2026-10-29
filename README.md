@@ -10,8 +10,8 @@
 |---|---|
 | Demand Forecasting | Prophet (Facebook) / NumPy |
 | Smart Pricing | scikit-learn + competitor data |
-| AI Product Description | Claude API (Anthropic) |
-| AI Image Generator | DALL-E 3 (OpenAI) |
+| AI Product Description | Anthropic |
+| AI Image Generator | DALL-E 3  |
 
 ### Customer Dashboard
 | Feature | Tech |
